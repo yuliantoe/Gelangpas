@@ -1,0 +1,6 @@
+{
+  "name": "GelangPass — QR Gelang Tiket & Manajemen Acara",
+  "description": "Platform generator QR code gelang tiket terenkripsi AES-256, manajemen pengunjung real-time, integrasi pembayaran langsung, analitik arus masuk, dan dukungan check-in offline.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

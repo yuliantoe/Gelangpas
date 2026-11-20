@@ -99,6 +99,7 @@ export default function App() {
     setSimulatedOffline,
     isOnline,
     wsConnected,
+    pollingActive,
     pendingCount,
     pendingCheckIns,
     pendingOrders,
@@ -492,7 +493,11 @@ export default function App() {
               title="Kelola mode offline & enkripsi"
             >
               {isOnline ? (
-                <Wifi className={`w-3.5 h-3.5 ${wsConnected ? 'text-emerald-600' : 'text-slate-500'}`} />
+                <Wifi
+                  className={`w-3.5 h-3.5 ${
+                    wsConnected || pollingActive ? 'text-emerald-600' : 'text-slate-500'
+                  }`}
+                />
               ) : (
                 <WifiOff className="w-3.5 h-3.5 text-amber-600" />
               )}
@@ -500,7 +505,9 @@ export default function App() {
                 {isOnline
                   ? wsConnected
                     ? 'Sinkronisasi Real-Time'
-                    : 'Menghubungkan...'
+                    : pollingActive
+                      ? 'Sinkronisasi Cloud'
+                      : 'Menghubungkan...'
                   : 'Mode Offline Aktif'}
               </span>
               {pendingCount > 0 && (

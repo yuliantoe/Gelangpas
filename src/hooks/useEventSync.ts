@@ -50,6 +50,8 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
   const [snapshot, setSnapshot] = useState<AppStateSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
+  const [pollingActive, setPollingActive] = useState(false);
+  const [wsDisabled, setWsDisabled] = useState(false);
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingOfflineCheckIn[]>([]);
   const [pendingOrders, setPendingOrders] = useState<PendingOfflineOrder[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -118,9 +120,19 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
 
       if (isOnline) {
         try {
-          const res = await fetch('/api/state', {
-            headers: getContextHeaders(),
-          });
+          const [res, healthRes] = await Promise.all([
+            fetch('/api/state', {
+              headers: getContextHeaders(),
+            }),
+            fetch('/api/health').catch(() => null),
+          ]);
+          if (healthRes?.ok && !cancelled) {
+            const health = (await healthRes.json()) as { realtimeTransport?: string };
+            if (health.realtimeTransport === 'http-polling') {
+              setWsDisabled(true);
+              setPollingActive(true);
+            }
+          }
           if (res.ok) {
             const data = (await res.json()) as AppStateSnapshot;
             if (!cancelled) {
@@ -151,7 +163,7 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
     }
   }, [snapshot]);
 
-  // WebSocket real-time synchronization
+  // WebSocket real-time synchronization (with automatic HTTP polling fallback on serverless hosts like Vercel)
   useEffect(() => {
     if (!isOnline) {
       if (wsRef.current) {
@@ -159,11 +171,19 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         wsRef.current = null;
       }
       setWsConnected(false);
+      setPollingActive(false);
+      return;
+    }
+
+    if (wsDisabled) {
+      setWsConnected(false);
+      setPollingActive(true);
       return;
     }
 
     let reconnectTimer: number | null = null;
     let unmounted = false;
+    let consecutiveFailures = 0;
 
     function connect() {
       if (unmounted) return;
@@ -175,16 +195,29 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
       const query = params.toString() ? `?${params.toString()}` : '';
       const ws = new WebSocket(`${protocol}//${window.location.host}/ws${query}`);
       wsRef.current = ws;
+      let opened = false;
 
       ws.onopen = () => {
-        if (!unmounted) setWsConnected(true);
+        opened = true;
+        consecutiveFailures = 0;
+        if (!unmounted) {
+          setWsConnected(true);
+          setPollingActive(false);
+        }
       };
 
       ws.onclose = () => {
-        if (!unmounted) {
-          setWsConnected(false);
-          reconnectTimer = window.setTimeout(connect, 2500);
+        if (unmounted) return;
+        setWsConnected(false);
+        if (!opened) {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= 2) {
+            setWsDisabled(true);
+            setPollingActive(true);
+            return;
+          }
         }
+        reconnectTimer = window.setTimeout(connect, 2500);
       };
 
       ws.onmessage = (event) => {
@@ -313,7 +346,42 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       if (wsRef.current) wsRef.current.close();
     };
-  }, [isOnline, showToast, activeUserId, preferredEventId]);
+  }, [isOnline, wsDisabled, showToast, activeUserId, preferredEventId]);
+
+  // HTTP Cloud Polling fallback when running in serverless mode (no WebSocket upgrade)
+  useEffect(() => {
+    if (!isOnline || !pollingActive) return;
+    let cancelled = false;
+
+    const pollState = async () => {
+      if (cancelled || document.visibilityState === 'hidden') return;
+      try {
+        const res = await fetch('/api/state', {
+          headers: getContextHeaders(),
+        });
+        if (res.ok && !cancelled) {
+          const data = (await res.json()) as AppStateSnapshot;
+          setSnapshot(data);
+        }
+      } catch {
+        // Ignore transient polling error
+      }
+    };
+
+    const interval = window.setInterval(pollState, 6000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void pollState();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [isOnline, pollingActive, getContextHeaders]);
 
   const syncNow = useCallback(async () => {
     if (!isOnline || syncing) return { syncedCheckIns: 0, syncedOrders: 0 };
@@ -382,7 +450,24 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
             status: CheckInResult['status'];
             message?: string;
             attendee?: Attendee;
+            log?: CheckInLog;
           };
+          if (data.attendee || data.log) {
+            setSnapshot((prev) => {
+              if (!prev) return prev;
+              const nextLogs =
+                data.log && !prev.checkInLogs.some((l) => l.id === data.log!.id)
+                  ? [data.log!, ...prev.checkInLogs]
+                  : prev.checkInLogs;
+              return {
+                ...prev,
+                attendees: data.attendee
+                  ? prev.attendees.map((a) => (a.id === data.attendee!.id ? data.attendee! : a))
+                  : prev.attendees,
+                checkInLogs: nextLogs,
+              };
+            });
+          }
           if (data.ok && data.attendee) {
             return {
               ok: true,
@@ -553,10 +638,24 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
           const err = (await res.json()) as { error?: string };
           throw new Error(err.error || 'Gagal memproses pembayaran');
         }
-        return (await res.json()) as {
+        const data = (await res.json()) as {
           attendees: Attendee[];
           transaction: PaymentTransaction;
         };
+        setSnapshot((prev) => {
+          if (!prev) return prev;
+          const existingAttIds = new Set(prev.attendees.map((a) => a.id));
+          const newAttendees = data.attendees.filter((a) => !existingAttIds.has(a.id));
+          const nextTransactions = prev.transactions.some((t) => t.id === data.transaction.id)
+            ? prev.transactions
+            : [data.transaction, ...prev.transactions];
+          return {
+            ...prev,
+            attendees: [...newAttendees, ...prev.attendees],
+            transactions: nextTransactions,
+          };
+        });
+        return data;
       }
 
       if (!snapshot) throw new Error('Snapshot offline tidak tersedia.');
@@ -664,7 +763,17 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         body: JSON.stringify(input),
       });
       if (!res.ok) throw new Error('Gagal membuat gelang massal.');
-      return (await res.json()) as { created: Attendee[] };
+      const data = (await res.json()) as { created: Attendee[] };
+      setSnapshot((prev) => {
+        if (!prev) return prev;
+        const existingIds = new Set(prev.attendees.map((a) => a.id));
+        const added = data.created.filter((a) => !existingIds.has(a.id));
+        return {
+          ...prev,
+          attendees: [...added, ...prev.attendees],
+        };
+      });
+      return data;
     },
     [getContextHeaders]
   );
@@ -677,7 +786,20 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         body: JSON.stringify({ revoked }),
       });
       if (!res.ok) throw new Error('Gagal mengubah status gelang.');
-      return res.json();
+      const data = (await res.json()) as { attendee?: Attendee };
+      if (data.attendee) {
+        setSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                attendees: prev.attendees.map((a) =>
+                  a.id === data.attendee!.id ? data.attendee! : a
+                ),
+              }
+            : prev
+        );
+      }
+      return data;
     },
     [getContextHeaders]
   );
@@ -690,7 +812,30 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         body: JSON.stringify(design),
       });
       if (!res.ok) throw new Error('Gagal menyimpan desain gelang.');
-      return res.json();
+      const data = (await res.json()) as {
+        design: WristbandDesign;
+        activeDesignId: string;
+      };
+      if (data.design) {
+        setSnapshot((prev) => {
+          if (!prev) return prev;
+          const exists = prev.designs.some((d) => d.id === data.design.id);
+          const designs = exists
+            ? prev.designs.map((d) => (d.id === data.design.id ? data.design : d))
+            : [data.design, ...prev.designs];
+          return {
+            ...prev,
+            designs,
+            event: { ...prev.event, activeDesignId: data.activeDesignId },
+            events: prev.events
+              ? prev.events.map((ev) =>
+                  ev.id === prev.event.id ? { ...ev, activeDesignId: data.activeDesignId } : ev
+                )
+              : undefined,
+          };
+        });
+      }
+      return data;
     },
     [getContextHeaders]
   );
@@ -886,6 +1031,13 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
       });
       const data = (await res.json()) as { user?: PlatformUser; error?: string };
       if (!res.ok) throw new Error(data.error || 'Gagal menambahkan pengguna.');
+      if (data.user) {
+        setSnapshot((prev) => {
+          if (!prev) return prev;
+          if (prev.users.some((u) => u.id === data.user!.id)) return prev;
+          return { ...prev, users: [data.user!, ...prev.users] };
+        });
+      }
       return data.user!;
     },
     [getContextHeaders]
@@ -900,6 +1052,16 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
       });
       const data = (await res.json()) as { user?: PlatformUser; error?: string };
       if (!res.ok) throw new Error(data.error || 'Gagal memperbarui pengguna.');
+      if (data.user) {
+        setSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                users: prev.users.map((u) => (u.id === data.user!.id ? data.user! : u)),
+              }
+            : prev
+        );
+      }
       return data.user!;
     },
     [getContextHeaders]
@@ -913,6 +1075,14 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error || 'Gagal menghapus pengguna.');
+      setSnapshot((prev) =>
+        prev
+          ? {
+              ...prev,
+              users: prev.users.filter((u) => u.id !== id),
+            }
+          : prev
+      );
       return data;
     },
     [getContextHeaders]
@@ -930,19 +1100,35 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
   }, [getContextHeaders]);
 
   const markNotificationRead = useCallback(async (id?: string) => {
-    await fetch('/api/notifications/read', {
+    const res = await fetch('/api/notifications/read', {
       method: 'PATCH',
       headers: getContextHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ id }),
     });
+    if (res.ok) {
+      const data = (await res.json()) as { notifications?: OrganizerNotification[] };
+      if (data.notifications) {
+        setSnapshot((prev) =>
+          prev ? { ...prev, notifications: data.notifications! } : prev
+        );
+      }
+    }
   }, [getContextHeaders]);
 
   const updateNotificationRules = useCallback(async (rules: Partial<NotificationRules>) => {
-    await fetch('/api/notification-rules', {
+    const res = await fetch('/api/notification-rules', {
       method: 'PATCH',
       headers: getContextHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(rules),
     });
+    if (res.ok) {
+      const data = (await res.json()) as { notificationRules?: NotificationRules };
+      if (data.notificationRules) {
+        setSnapshot((prev) =>
+          prev ? { ...prev, notificationRules: data.notificationRules! } : prev
+        );
+      }
+    }
   }, [getContextHeaders]);
 
   return {
@@ -953,6 +1139,7 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
     setSimulatedOffline,
     isOnline,
     wsConnected,
+    pollingActive,
     pendingCount: pendingCheckIns.length + pendingOrders.length,
     pendingCheckIns,
     pendingOrders,

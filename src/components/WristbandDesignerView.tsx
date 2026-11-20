@@ -21,6 +21,7 @@ import type {
   WristbandPattern,
 } from '../types/event.ts';
 import {
+  TICKET_PREVIEW_LAYOUT_OPTIONS,
   WristbandPreview,
   downloadBatchWristbandsPng,
   downloadWristbandPng,
@@ -45,7 +46,51 @@ const THEME_PRESETS: Array<{
   tagline: string;
 }> = [
   {
-    label: 'Acara Sekolah',
+    label: 'Sport Running',
+    primaryColor: '#0F172A',
+    secondaryColor: '#EA580C',
+    accentColor: '#BEF264',
+    textColor: '#FFFFFF',
+    pattern: 'diagonal',
+    material: 'rfid-pvc',
+    sponsorLabel: 'Official Race Runner Pass',
+    tagline: 'Start Corral · Hydration & Finisher Zone',
+  },
+  {
+    label: 'Konser Musik',
+    primaryColor: '#1E1B4B',
+    secondaryColor: '#9333EA',
+    accentColor: '#F472B6',
+    textColor: '#FFFFFF',
+    pattern: 'wave',
+    material: 'woven',
+    sponsorLabel: 'Live Concert Stage Official',
+    tagline: 'Festival Pit · Soundcheck & Encore',
+  },
+  {
+    label: 'Bisnis',
+    primaryColor: '#0F172A',
+    secondaryColor: '#334155',
+    accentColor: '#E2E8F0',
+    textColor: '#F8FAFC',
+    pattern: 'grid',
+    material: 'rfid-pvc',
+    sponsorLabel: 'Executive Business Forum',
+    tagline: 'Main Ballroom & Executive Lounge',
+  },
+  {
+    label: 'Reuni',
+    primaryColor: '#451A03',
+    secondaryColor: '#B45309',
+    accentColor: '#FDE68A',
+    textColor: '#FFFBEB',
+    pattern: 'geometric',
+    material: 'woven',
+    sponsorLabel: 'Ikatan Alumni & Temu Kangen',
+    tagline: 'Hall Utama · Gala Dinner & Nostalgia',
+  },
+  {
+    label: 'Sekolah',
     primaryColor: '#1E3A8A',
     secondaryColor: '#0284C7',
     accentColor: '#FACC15',
@@ -56,15 +101,15 @@ const THEME_PRESETS: Array<{
     tagline: 'Akses Siswa, Guru & Wali Murid',
   },
   {
-    label: 'Acara Bisnis',
-    primaryColor: '#0F172A',
-    secondaryColor: '#334155',
-    accentColor: '#E2E8F0',
-    textColor: '#F8FAFC',
-    pattern: 'grid',
-    material: 'rfid-pvc',
-    sponsorLabel: 'Executive Business Forum',
-    tagline: 'Main Ballroom & Executive Lounge',
+    label: 'Universitas',
+    primaryColor: '#4C0519',
+    secondaryColor: '#881337',
+    accentColor: '#FDE047',
+    textColor: '#FFF1F2',
+    pattern: 'diagonal',
+    material: 'woven',
+    sponsorLabel: 'BEM & Senat Universitas',
+    tagline: 'Auditorium Kampus & Zona Fakultas',
   },
   {
     label: 'Festival',
@@ -78,47 +123,29 @@ const THEME_PRESETS: Array<{
     tagline: 'Panggung Utama & Zona Kuliner',
   },
   {
-    label: 'Musik',
-    primaryColor: '#4C1D95',
-    secondaryColor: '#BE123C',
-    accentColor: '#FDA4AF',
-    textColor: '#FFFFFF',
-    pattern: 'wave',
-    material: 'woven',
-    sponsorLabel: 'Sound Stage Official',
-    tagline: 'Festival Area & Front Row',
-  },
-  {
     label: 'Gala Eksklusif',
     primaryColor: '#18181B',
     secondaryColor: '#92400E',
     accentColor: '#FBBF24',
     textColor: '#FAFAFA',
-    pattern: 'diagonal',
+    pattern: 'solid',
     material: 'silicone',
     sponsorLabel: 'VIP Priority Access',
     tagline: 'Undangan VIP Lounge & Dinner',
-  },
-  {
-    label: 'Olahraga & Maraton',
-    primaryColor: '#7F1D1D',
-    secondaryColor: '#DC2626',
-    accentColor: '#FCA5A5',
-    textColor: '#FFFFFF',
-    pattern: 'wave',
-    material: 'rfid-pvc',
-    sponsorLabel: 'Official Race Pass',
-    tagline: 'Start Zone & Hydration Bay',
   },
 ];
 
 const COLLECTION_FILTERS = [
   'Semua',
+  'Koleksi GKL',
   'Kustom',
-  'Acara Sekolah',
-  'Acara Bisnis',
+  'Sport Running',
+  'Konser Musik',
+  'Bisnis',
+  'Reuni',
+  'Sekolah',
+  'Universitas',
   'Festival',
-  'Musik',
 ] as const;
 
 export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
@@ -182,6 +209,11 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
 
   const filteredDesigns = useMemo(() => {
     if (collectionFilter === 'Semua') return snapshot.designs;
+    if (collectionFilter === 'Koleksi GKL') {
+      return snapshot.designs.filter(
+        (d) => d.id.startsWith('dsn-gkl-') || d.name.toUpperCase().startsWith('GKL.')
+      );
+    }
     if (collectionFilter === 'Kustom') {
       return snapshot.designs.filter(
         (d) =>
@@ -190,8 +222,20 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
           d.themePreset.toLowerCase().includes('kustom')
       );
     }
+    if (collectionFilter === 'Sport Running') {
+      return snapshot.designs.filter((d) => {
+        const p = d.themePreset.toLowerCase();
+        return p.includes('sport') || p.includes('running') || p.includes('maraton');
+      });
+    }
+    if (collectionFilter === 'Konser Musik') {
+      return snapshot.designs.filter((d) => {
+        const p = d.themePreset.toLowerCase();
+        return p.includes('musik') || p.includes('konser');
+      });
+    }
     return snapshot.designs.filter((d) =>
-      d.themePreset.toLowerCase().includes(collectionFilter.toLowerCase().replace('acara ', ''))
+      d.themePreset.toLowerCase().includes(collectionFilter.toLowerCase())
     );
   }, [snapshot.designs, collectionFilter]);
 
@@ -879,6 +923,40 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
               )}
             </div>
 
+            {/* Ticket Preview Layout Style Picker */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-700">
+                  Desain Pilihan Pratinjau Tiket
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Tersedia untuk pratinjau, cetak A4 & unduh PNG
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {TICKET_PREVIEW_LAYOUT_OPTIONS.map((opt) => {
+                  const active = (draft.previewLayout ?? 'wristband') === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setDraft((prev) => ({ ...prev, previewLayout: opt.id }))}
+                      className={`p-2.5 rounded-lg border text-left transition-colors ${
+                        active
+                          ? 'border-blue-600 bg-blue-50 text-blue-950'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold whitespace-nowrap truncate">{opt.label}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">
+                        {opt.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {sampleAttendee ? (
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
                 <WristbandPreview
@@ -888,7 +966,10 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
                 />
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
                   <span>
-                    Dimensi cetak: 250 × {draft.widthMm} mm · Resolusi ekspor 1600 px
+                    Dimensi ekspor: 1600 px ·{' '}
+                    {TICKET_PREVIEW_LAYOUT_OPTIONS.find(
+                      (o) => o.id === (draft.previewLayout ?? 'wristband')
+                    )?.label || 'Gelang Pita QR'}
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
@@ -897,7 +978,11 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100 transition-colors whitespace-nowrap"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Unduh PNG Gelang</span>
+                      <span>
+                        {(draft.previewLayout ?? 'wristband') === 'wristband'
+                          ? 'Unduh PNG Gelang'
+                          : 'Unduh PNG Tiket'}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -946,6 +1031,7 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
                     onClick={() =>
                       setDraft((prev) => ({
                         ...d,
+                        previewLayout: d.previewLayout ?? prev.previewLayout ?? 'wristband',
                         brandLogoDataUrl: d.brandLogoDataUrl ?? prev.brandLogoDataUrl ?? null,
                         customBackgroundDataUrl: d.customBackgroundDataUrl ?? null,
                         customOverlayOpacity: d.customOverlayOpacity ?? 0.25,
@@ -1128,8 +1214,31 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
                 </div>
 
                 {/* Print & Download Checklist Options */}
-                <div className="p-4 border-t border-slate-200 bg-white space-y-2 shrink-0">
-                  <p className="text-[11px] font-semibold text-slate-700 mb-1">
+                <div className="p-4 border-t border-slate-200 bg-white space-y-2.5 shrink-0">
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-700 mb-1.5">
+                      Format Tiket / Gelang Cetak
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {TICKET_PREVIEW_LAYOUT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            setDraft((prev) => ({ ...prev, previewLayout: opt.id }))
+                          }
+                          className={`px-2 py-1.5 rounded-md border text-[11px] font-medium transition-colors text-left truncate ${
+                            (draft.previewLayout ?? 'wristband') === opt.id
+                              ? 'border-blue-600 bg-blue-50 text-blue-900'
+                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-700 pt-1">
                     Opsi Ceklis Cetak & Unduh Desain
                   </p>
                   <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">

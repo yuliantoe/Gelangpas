@@ -9,8 +9,17 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import type { AppStateSnapshot, Attendee, TicketTier } from '../types/event.ts';
-import { WristbandPreview, downloadWristbandPng } from './WristbandPreview.tsx';
+import type {
+  AppStateSnapshot,
+  Attendee,
+  TicketPreviewLayout,
+  TicketTier,
+} from '../types/event.ts';
+import {
+  TICKET_PREVIEW_LAYOUT_OPTIONS,
+  WristbandPreview,
+  downloadWristbandPng,
+} from './WristbandPreview.tsx';
 
 interface VisitorsViewProps {
   snapshot: AppStateSnapshot;
@@ -34,6 +43,7 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | 'checked-in' | 'pending' | 'revoked'>('all');
   const [tierFilter, setTierFilter] = useState<'all' | TicketTier>('all');
   const [previewAttendee, setPreviewAttendee] = useState<Attendee | null>(null);
+  const [modalLayoutOverride, setModalLayoutOverride] = useState<TicketPreviewLayout | null>(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
 
   const tierOptions = useMemo(
@@ -258,14 +268,14 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
         </div>
       </div>
 
-      {/* Modal: Wristband QR Viewer & Download */}
+      {/* Modal: Wristband & Ticket QR Viewer & Download */}
       {previewAttendee && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
           <div className="w-full max-w-3xl rounded-xl bg-white border border-slate-200 p-6 shadow-xl space-y-5">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display text-base font-semibold text-slate-900">
-                  Gelang Tiket Terenkripsi · {previewAttendee.fullName}
+                  Pratinjau Tiket Terenkripsi · {previewAttendee.fullName}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {previewAttendee.ticketCode} · Enkripsi AES-256-GCM (v{snapshot.event.encryptionKeyVersion})
@@ -273,16 +283,42 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setPreviewAttendee(null)}
+                onClick={() => {
+                  setPreviewAttendee(null);
+                  setModalLayoutOverride(null);
+                }}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
+              {TICKET_PREVIEW_LAYOUT_OPTIONS.map((opt) => {
+                const current = modalLayoutOverride ?? activeDesign.previewLayout ?? 'wristband';
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setModalLayoutOverride(opt.id)}
+                    className={`flex-1 min-w-[120px] px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                      current === opt.id
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
               <WristbandPreview
-                design={activeDesign}
+                design={{
+                  ...activeDesign,
+                  previewLayout: modalLayoutOverride ?? activeDesign.previewLayout ?? 'wristband',
+                }}
                 event={snapshot.event}
                 attendee={previewAttendee}
               />
@@ -301,12 +337,20 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
               <button
                 type="button"
                 onClick={() =>
-                  downloadWristbandPng(activeDesign, snapshot.event, previewAttendee)
+                  downloadWristbandPng(
+                    {
+                      ...activeDesign,
+                      previewLayout:
+                        modalLayoutOverride ?? activeDesign.previewLayout ?? 'wristband',
+                    },
+                    snapshot.event,
+                    previewAttendee
+                  )
                 }
                 className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Unduh PNG Gelang</span>
+                <span>Unduh PNG Tiket</span>
               </button>
             </div>
           </div>

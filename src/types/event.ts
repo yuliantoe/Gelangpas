@@ -31,11 +31,19 @@ export type WristbandMaterial = 'tyvek' | 'woven' | 'silicone' | 'rfid-pvc';
 
 export type WristbandPattern = 'solid' | 'diagonal' | 'geometric' | 'wave' | 'grid';
 
+export type TicketPreviewLayout =
+  | 'wristband'
+  | 'concert-ticket'
+  | 'boarding-pass'
+  | 'gallery-pass'
+  | 'invitation-card';
+
 export interface WristbandDesign {
   id: string;
   eventId: string;
   name: string;
   themePreset: string;
+  previewLayout?: TicketPreviewLayout;
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;

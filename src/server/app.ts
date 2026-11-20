@@ -22,6 +22,7 @@ import type {
   UserRole,
   WristbandDesign,
 } from '../types/event.ts';
+import { getAccessTier, getRoleCapabilities } from '../lib/permissions.ts';
 
 export const IS_VERCEL = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
 
@@ -234,6 +235,19 @@ function buildDefaultUsers(defaultEventId = 'ev-soundscape-2026'): PlatformUser[
       lastActiveAt: now,
     },
     {
+      id: 'usr-admin-all',
+      fullName: 'Administrator Akses Semua',
+      email: 'admin.semua@gelangpass.id',
+      role: 'administrator',
+      organizationName: 'GelangPass Pusat (Akses Semua)',
+      assignedEventIds: ['*'],
+      isOwner: true,
+      assignedGate: 'Semua Gerbang',
+      active: true,
+      createdAt: now,
+      lastActiveAt: now,
+    },
+    {
       id: 'usr-admin-2',
       fullName: 'Nadira Kusuma (Koordinator)',
       email: 'nadira.admin@gelangpass.id',
@@ -286,7 +300,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'woven',
       pattern: 'diagonal',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -306,7 +321,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'woven',
       pattern: 'wave',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -326,7 +342,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFBEB',
       material: 'woven',
       pattern: 'geometric',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -346,7 +363,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'tyvek',
       pattern: 'geometric',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -366,7 +384,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#ECFDF5',
       material: 'silicone',
       pattern: 'diagonal',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: false,
@@ -386,7 +405,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#F8FAFC',
       material: 'rfid-pvc',
       pattern: 'grid',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -406,7 +426,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'tyvek',
       pattern: 'solid',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -426,7 +447,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FAFAFA',
       material: 'silicone',
       pattern: 'geometric',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: false,
@@ -446,7 +468,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'rfid-pvc',
       pattern: 'diagonal',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -466,7 +489,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'tyvek',
       pattern: 'wave',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -486,7 +510,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'woven',
       pattern: 'wave',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -506,7 +531,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#F8FAFC',
       material: 'rfid-pvc',
       pattern: 'grid',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -526,7 +552,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFBEB',
       material: 'woven',
       pattern: 'geometric',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -546,7 +573,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#F8FAFC',
       material: 'silicone',
       pattern: 'solid',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: false,
@@ -566,7 +594,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'tyvek',
       pattern: 'diagonal',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -586,7 +615,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFF1F2',
       material: 'woven',
       pattern: 'geometric',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -606,7 +636,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'woven',
       pattern: 'wave',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -626,7 +657,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'tyvek',
       pattern: 'geometric',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -646,7 +678,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFF1F2',
       material: 'woven',
       pattern: 'wave',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -666,7 +699,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'woven',
       pattern: 'diagonal',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -686,7 +720,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'tyvek',
       pattern: 'geometric',
-      widthMm: 25,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -706,7 +741,8 @@ function buildDefaultDesigns(eventId: string): WristbandDesign[] {
       textColor: '#FFFFFF',
       material: 'tyvek',
       pattern: 'diagonal',
-      widthMm: 19,
+      widthMm: 22,
+      lengthCm: 28,
       showHolderName: true,
       showTierBadge: true,
       showPerforation: true,
@@ -944,6 +980,13 @@ function normalizeLoadedStore(loaded: ServerStore): { store: ServerStore; change
       changed = true;
     }
   }
+  for (const d of loaded.designs) {
+    if (d.widthMm !== 22 || d.lengthCm !== 28) {
+      d.widthMm = 22;
+      d.lengthCm = 28;
+      changed = true;
+    }
+  }
   if (!loaded.event.organizerName) {
     loaded.event.organizerName = 'Soundscape Live Indonesia';
     changed = true;
@@ -975,8 +1018,32 @@ function normalizeLoadedStore(loaded: ServerStore): { store: ServerStore; change
     changed = true;
   }
   const allKnownEventIds = loaded.events.map((e) => e.id);
+  if (!loaded.users.some((u) => u.id === 'usr-admin-all')) {
+    const nowIso = new Date().toISOString();
+    const adminAllUser: PlatformUser = {
+      id: 'usr-admin-all',
+      fullName: 'Administrator Akses Semua',
+      email: 'admin.semua@gelangpass.id',
+      role: 'administrator',
+      organizationName: 'GelangPass Pusat (Akses Semua)',
+      assignedEventIds: ['*'],
+      isOwner: true,
+      assignedGate: 'Semua Gerbang',
+      active: true,
+      createdAt: nowIso,
+      lastActiveAt: nowIso,
+    };
+    const ownerIdx = loaded.users.findIndex((u) => u.id === 'usr-admin-1');
+    if (ownerIdx >= 0) {
+      loaded.users.splice(ownerIdx + 1, 0, adminAllUser);
+    } else {
+      loaded.users.unshift(adminAllUser);
+    }
+    loaded.userPasswords[adminAllUser.id] = hashPassword(getDefaultPasswordForRole('administrator'));
+    changed = true;
+  }
   for (const u of loaded.users) {
-    if (u.id === 'usr-admin-1' && !u.isOwner) {
+    if ((u.id === 'usr-admin-1' || u.id === 'usr-admin-all') && !u.isOwner) {
       u.isOwner = true;
       u.organizationName = u.organizationName || 'GelangPass Pusat';
       u.assignedEventIds = ['*'];
@@ -1104,6 +1171,8 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
       targetEvent = accessibleEvents[0] || store.event;
     }
 
+    const actorTier = actor ? getAccessTier(actor) : 'super-admin';
+    const actorCaps = getRoleCapabilities(actorTier);
     const activeEventId = targetEvent.id;
     const scopedUsers = actor
       ? store.users.filter((u) => usersShareOrganizerScope(actor, u))
@@ -1113,13 +1182,24 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
       ? store.notifications.filter((n) => !n.eventId || canUserAccessEvent(actor, n.eventId))
       : store.notifications;
 
+    const eventLogs = store.checkInLogs.filter((l) => !l.eventId || l.eventId === activeEventId);
+    const scopedLogs =
+      actor && actorTier === 'gate' && actor.assignedGate && actor.assignedGate !== 'Semua Gerbang'
+        ? eventLogs.filter((l) => l.gate === actor.assignedGate)
+        : eventLogs;
+
+    const scopedTransactions =
+      actor && !actorCaps.canManageAttendeesAndCategories
+        ? []
+        : store.transactions.filter((t) => !t.eventId || t.eventId === activeEventId);
+
     return {
       ...rest,
       event: targetEvent,
       events: accessibleEvents.length > 0 ? accessibleEvents : [targetEvent],
       attendees: store.attendees.filter((a) => a.eventId === activeEventId),
-      checkInLogs: store.checkInLogs.filter((l) => !l.eventId || l.eventId === activeEventId),
-      transactions: store.transactions.filter((t) => !t.eventId || t.eventId === activeEventId),
+      checkInLogs: scopedLogs,
+      transactions: scopedTransactions,
       users: scopedUsers,
       notifications: scopedNotifications,
       onlineSessions: getOnlineSessionsForEvent(activeEventId),
@@ -1308,7 +1388,13 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
   });
 
   app.post('/api/attendees/batch', (req, res) => {
-    const { targetEvent } = resolveRequestContext(req);
+    const { actor, targetEvent } = resolveRequestContext(req);
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canManageAttendeesAndCategories) {
+      res.status(403).json({
+        error: 'Sistem Cek (Gate) tidak memiliki izin untuk mengelola data peserta atau membuat gelang batch.',
+      });
+      return;
+    }
     const { prefixName, tier, count, gateAssigned } = req.body as {
       prefixName: string;
       tier: TicketTier;
@@ -1367,6 +1453,13 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
   });
 
   app.patch('/api/attendees/:id', (req, res) => {
+    const { actor } = resolveRequestContext(req);
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canBlockOrReissueWristband) {
+      res.status(403).json({
+        error: 'Sistem Cek (Gate) tidak memiliki izin untuk memblokir atau mengubah data gelang.',
+      });
+      return;
+    }
     const { id } = req.params;
     const { revoked, gateAssigned, tier } = req.body as Partial<Attendee>;
     const attendee = store.attendees.find((a) => a.id === id);
@@ -1395,6 +1488,60 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
     res.json({ attendee });
   });
 
+  app.post('/api/attendees/:id/reissue', (req, res) => {
+    const { actor } = resolveRequestContext(req);
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canBlockOrReissueWristband) {
+      res.status(403).json({
+        error: 'Sistem Cek (Gate) tidak memiliki izin untuk menerbitkan ulang (reissue) gelang hilang.',
+      });
+      return;
+    }
+    const { id } = req.params;
+    const attendee = store.attendees.find((a) => a.id === id);
+    if (!attendee) {
+      res.status(404).json({ error: 'Peserta tidak ditemukan.' });
+      return;
+    }
+    const ev = store.events.find((e) => e.id === attendee.eventId) || store.event;
+    const oldCode = attendee.ticketCode;
+    const newCode = makeTicketCode(attendee.tier);
+    const newToken = encryptTokenServer(
+      {
+        id: attendee.id,
+        code: newCode,
+        ev: attendee.eventId,
+        tier: attendee.tier,
+        name: attendee.fullName,
+        gate: attendee.gateAssigned,
+        ver: ev.encryptionKeyVersion,
+        ts: Math.floor(Date.now() / 1000),
+      },
+      store.gateEncryptionKeyHex
+    );
+
+    attendee.ticketCode = newCode;
+    attendee.qrToken = newToken;
+    attendee.revoked = false;
+    attendee.checkedIn = false;
+    attendee.checkedInAt = null;
+    attendee.checkedInGate = null;
+    attendee.checkedInMode = null;
+
+    if (store.notificationRules.notifyOnSecurityAlert) {
+      pushNotification({
+        eventId: attendee.eventId,
+        type: 'security-alert',
+        title: 'Reissue Gelang Hilang Berhasil',
+        message: `Gelang lama ${oldCode} milik ${attendee.fullName} dinonaktifkan dan diganti kode baru ${newCode}.`,
+        severity: 'info',
+      });
+    }
+
+    persistStore();
+    broadcast('attendee:updated', attendee, attendee.eventId);
+    res.json({ attendee, oldCode, newCode });
+  });
+
   app.post('/api/checkin', (req, res) => {
     const { actor, targetEvent } = resolveRequestContext(req);
     const { qrToken, ticketCode, gate, deviceId = 'GATE-TERM-01' } = req.body as {
@@ -1405,6 +1552,20 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
     };
 
     const activeGate = gate || targetEvent.gates[0];
+    const isRestrictedGateStaff =
+      actor &&
+      getAccessTier(actor) === 'gate' &&
+      actor.assignedGate &&
+      actor.assignedGate !== 'Semua Gerbang';
+
+    if (isRestrictedGateStaff && activeGate !== actor.assignedGate) {
+      res.status(403).json({
+        ok: false,
+        status: 'invalid-signature',
+        message: `Akun Sistem Cek (${actor.fullName}) hanya berwenang memvalidasi di ${actor.assignedGate}.`,
+      });
+      return;
+    }
     let targetAttendee: Attendee | undefined;
 
     if (qrToken && qrToken.startsWith('GP1.')) {
@@ -1463,6 +1624,21 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
 
     if (!targetAttendee) {
       res.status(404).json({ ok: false, status: 'not-found', message: 'Kode gelang tiket tidak ditemukan di basis data acara aktif.' });
+      return;
+    }
+
+    if (
+      isRestrictedGateStaff &&
+      targetAttendee.gateAssigned &&
+      targetAttendee.gateAssigned !== 'Semua Gerbang' &&
+      targetAttendee.gateAssigned !== activeGate
+    ) {
+      res.status(403).json({
+        ok: false,
+        status: 'invalid-signature',
+        message: `Gelang ${targetAttendee.ticketCode} khusus zona ${targetAttendee.gateAssigned}, tidak sesuai dengan gate petugas (${activeGate}).`,
+        attendee: targetAttendee,
+      });
       return;
     }
 
@@ -1705,7 +1881,11 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
   });
 
   app.post('/api/designs', (req, res) => {
-    const { targetEvent } = resolveRequestContext(req);
+    const { actor, targetEvent } = resolveRequestContext(req);
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canManageSystemLimited) {
+      res.status(403).json({ error: 'Sistem Cek (Gate) tidak dapat mengubah desain gelang.' });
+      return;
+    }
     const design = req.body as WristbandDesign;
     if (!design || !design.name) {
       res.status(400).json({ error: 'Data desain gelang tidak lengkap.' });
@@ -1715,6 +1895,8 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
     const existingIdx = store.designs.findIndex((d) => d.id === design.id);
     const updatedDesign: WristbandDesign = {
       ...design,
+      widthMm: 22,
+      lengthCm: 28,
       id: design.id || `dsn-${crypto.randomUUID().slice(0, 8)}`,
       eventId: targetEvent.id,
       updatedAt: new Date().toISOString(),
@@ -1738,8 +1920,10 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
 
   app.post('/api/events', (req, res) => {
     const { actor, targetEvent: baseEvent } = resolveRequestContext(req);
-    if (actor && actor.role !== 'administrator') {
-      res.status(403).json({ error: 'Hanya Administrator penyelenggara yang dapat menambahkan acara baru.' });
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canManageSystemFull) {
+      res.status(403).json({
+        error: 'Hanya Super Admin yang dapat menambahkan acara baru (Pengaturan Sistem Penuh).',
+      });
       return;
     }
 
@@ -1887,8 +2071,10 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
 
   app.delete('/api/events/:id', (req, res) => {
     const { actor } = resolveRequestContext(req);
-    if (actor && actor.role !== 'administrator') {
-      res.status(403).json({ error: 'Hanya Administrator yang dapat menghapus acara.' });
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canManageSystemFull) {
+      res.status(403).json({
+        error: 'Hanya Super Admin yang dapat menghapus acara dari sistem.',
+      });
       return;
     }
     const { id } = req.params;
@@ -2098,10 +2284,11 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
   });
 
   app.post('/api/auth/login', (req, res) => {
-    const { email, password, expectedRole } = req.body as {
+    const { email, password, expectedRole, expectedLoginMenu } = req.body as {
       email?: string;
       password?: string;
       expectedRole?: UserRole;
+      expectedLoginMenu?: 'administrator' | 'admin' | 'user';
     };
     if (!email?.trim() || !password) {
       res.status(400).json({ error: 'Email dan kata sandi wajib diisi.' });
@@ -2117,11 +2304,34 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
       res.status(403).json({ error: 'Akun ini sedang dinonaktifkan oleh Administrator.' });
       return;
     }
+    const actualLoginMenu =
+      user.role === 'user'
+        ? 'user'
+        : hasAllEventsAccess(user)
+          ? 'administrator'
+          : 'admin';
+    const actualMenuLabel =
+      actualLoginMenu === 'administrator'
+        ? 'Administrator (Akses Semua)'
+        : actualLoginMenu === 'admin'
+          ? 'Admin'
+          : 'User';
+
+    if (expectedLoginMenu && actualLoginMenu !== expectedLoginMenu) {
+      res.status(403).json({
+        error: `Akun ini terdaftar pada menu ${actualMenuLabel}. Pilih tab ${
+          actualLoginMenu === 'administrator'
+            ? 'Administrator'
+            : actualLoginMenu === 'admin'
+              ? 'Admin'
+              : 'User'
+        } untuk masuk.`,
+      });
+      return;
+    }
     if (expectedRole && user.role !== expectedRole) {
       res.status(403).json({
-        error: `Akun ini terdaftar sebagai ${
-          user.role === 'administrator' ? 'Administrator' : 'User'
-        }. Pilih tab peran yang sesuai untuk masuk.`,
+        error: `Akun ini terdaftar sebagai ${actualMenuLabel}. Pilih tab peran yang sesuai untuk masuk.`,
       });
       return;
     }
@@ -2144,8 +2354,10 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
 
   app.post('/api/users', (req, res) => {
     const { actor, targetEvent } = resolveRequestContext(req);
-    if (actor && actor.role !== 'administrator') {
-      res.status(403).json({ error: 'Hanya Administrator penyelenggara yang dapat menambahkan akun tim.' });
+    const actorTier = actor ? getAccessTier(actor) : 'super-admin';
+    const actorCaps = getRoleCapabilities(actorTier);
+    if (actor && !actorCaps.canManageGateStaff) {
+      res.status(403).json({ error: 'Sistem Cek (Gate) tidak memiliki izin mengelola akun tim.' });
       return;
     }
 
@@ -2168,11 +2380,20 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
       res.status(409).json({ error: 'Email pengguna sudah terdaftar.' });
       return;
     }
-    const safeRole: UserRole = role === 'administrator' ? 'administrator' : 'user';
+    const requestedAdmin = role === 'administrator' || Boolean(assignedEventIds?.includes('*'));
+    if (requestedAdmin && actor && !actorCaps.canManageAdminsAndAccess) {
+      res.status(403).json({
+        error: 'Admin tidak dapat membuat akun Admin & hak akses. Hanya Super Admin yang berwenang.',
+      });
+      return;
+    }
+    const safeRole: UserRole = role === 'administrator' && (!actor || actorCaps.canManageAdminsAndAccess)
+      ? 'administrator'
+      : 'user';
 
     let finalEventIds: string[];
     if (Array.isArray(assignedEventIds) && assignedEventIds.length > 0) {
-      if (assignedEventIds.includes('*') && (!actor || hasAllEventsAccess(actor))) {
+      if (assignedEventIds.includes('*') && (!actor || actorCaps.canManageAdminsAndAccess)) {
         finalEventIds = ['*'];
       } else {
         const filtered = assignedEventIds.filter(
@@ -2199,8 +2420,7 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
       role: safeRole,
       organizationName: resolvedOrgName,
       assignedEventIds: finalEventIds,
-      assignedGate:
-        assignedGate || (safeRole === 'administrator' ? 'Semua Gerbang' : targetEvent.gates[0]),
+      assignedGate: assignedGate || targetEvent.gates[0],
       active: true,
       createdAt: new Date().toISOString(),
       lastActiveAt: null,
@@ -2213,8 +2433,10 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
     pushNotification({
       eventId: finalEventIds[0] !== '*' ? finalEventIds[0] : undefined,
       type: 'security-alert',
-      title: 'Pengguna Baru Ditambahkan',
-      message: `${newUser.fullName} (${newUser.organizationName}) ditambahkan sebagai ${safeRole === 'administrator' ? 'Administrator' : 'User'}.`,
+      title: 'Akun Tim Baru Ditambahkan',
+      message: `${newUser.fullName} (${newUser.organizationName}) ditambahkan sebagai ${
+        safeRole === 'administrator' ? 'Admin' : 'Sistem Cek (Gate)'
+      }.`,
       severity: 'info',
     });
     persistStore();
@@ -2224,8 +2446,10 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
 
   app.patch('/api/users/:id', (req, res) => {
     const { actor } = resolveRequestContext(req);
-    if (actor && actor.role !== 'administrator') {
-      res.status(403).json({ error: 'Hanya Administrator penyelenggara yang dapat mengubah akun tim.' });
+    const actorTier = actor ? getAccessTier(actor) : 'super-admin';
+    const actorCaps = getRoleCapabilities(actorTier);
+    if (actor && !actorCaps.canManageGateStaff) {
+      res.status(403).json({ error: 'Sistem Cek (Gate) tidak dapat mengubah akun tim.' });
       return;
     }
 
@@ -2241,19 +2465,29 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
       res.status(403).json({ error: 'Tidak dapat mengubah akun milik penyelenggara event lain.' });
       return;
     }
+    const targetIsAdmin = user.role === 'administrator';
+    const changingToAdmin = role === 'administrator' || Boolean(assignedEventIds?.includes('*'));
+    if ((targetIsAdmin || changingToAdmin) && actor && !actorCaps.canManageAdminsAndAccess) {
+      res.status(403).json({
+        error: 'Hanya Super Admin yang dapat mengelola akun Admin & hak akses.',
+      });
+      return;
+    }
 
     const activeAdmins = store.users.filter((u) => u.role === 'administrator' && u.active);
     const isLastActiveAdmin = user.role === 'administrator' && user.active && activeAdmins.length <= 1;
     if (isLastActiveAdmin && (role === 'user' || active === false)) {
-      res.status(400).json({ error: 'Minimal harus ada 1 Administrator aktif di platform.' });
+      res.status(400).json({ error: 'Minimal harus ada 1 Admin/Super Admin aktif di platform.' });
       return;
     }
 
     if (fullName?.trim()) user.fullName = fullName.trim();
-    if ((role === 'administrator' || role === 'user') && !user.isOwner) user.role = role;
+    if ((role === 'user' || role === 'administrator') && !user.isOwner && (!actor || actorCaps.canManageAdminsAndAccess)) {
+      user.role = role;
+    }
     if (organizationName?.trim()) user.organizationName = organizationName.trim();
     if (Array.isArray(assignedEventIds) && assignedEventIds.length > 0 && !user.isOwner) {
-      if (assignedEventIds.includes('*') && (!actor || hasAllEventsAccess(actor))) {
+      if (assignedEventIds.includes('*') && (!actor || actorCaps.canManageAdminsAndAccess)) {
         user.assignedEventIds = ['*'];
       } else {
         const filtered = assignedEventIds.filter(
@@ -2276,8 +2510,10 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
 
   app.delete('/api/users/:id', (req, res) => {
     const { actor } = resolveRequestContext(req);
-    if (actor && actor.role !== 'administrator') {
-      res.status(403).json({ error: 'Hanya Administrator penyelenggara yang dapat menghapus akun.' });
+    const actorTier = actor ? getAccessTier(actor) : 'super-admin';
+    const actorCaps = getRoleCapabilities(actorTier);
+    if (actor && !actorCaps.canManageGateStaff) {
+      res.status(403).json({ error: 'Sistem Cek (Gate) tidak dapat menghapus akun.' });
       return;
     }
 
@@ -2291,13 +2527,17 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
       res.status(400).json({ error: 'Akun Pemilik Utama Platform tidak dapat dihapus.' });
       return;
     }
+    if (user.role === 'administrator' && actor && !actorCaps.canManageAdminsAndAccess) {
+      res.status(403).json({ error: 'Hanya Super Admin yang dapat menghapus akun Admin.' });
+      return;
+    }
     if (actor && !usersShareOrganizerScope(actor, user)) {
       res.status(403).json({ error: 'Tidak dapat menghapus akun milik penyelenggara event lain.' });
       return;
     }
     const activeAdmins = store.users.filter((u) => u.role === 'administrator' && u.active);
     if (user.role === 'administrator' && user.active && activeAdmins.length <= 1) {
-      res.status(400).json({ error: 'Tidak dapat menghapus Administrator aktif terakhir.' });
+      res.status(400).json({ error: 'Tidak dapat menghapus Admin/Super Admin aktif terakhir.' });
       return;
     }
 
@@ -2310,6 +2550,12 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
 
   app.post('/api/security/rotate-key', (req, res) => {
     const { actor, targetEvent } = resolveRequestContext(req);
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canManageSystemFull) {
+      res.status(403).json({
+        error: 'Rotasi kunci enkripsi utama AES-256-GCM hanya tersedia untuk Super Admin.',
+      });
+      return;
+    }
     const newKeyHex = crypto.randomBytes(32).toString('hex');
     store.gateEncryptionKeyHex = newKeyHex;
     const nextKeyVersion = store.event.encryptionKeyVersion + 1;
@@ -2352,6 +2598,14 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
   });
 
   app.post('/api/security/verify-pin', (req, res) => {
+    const { actor } = resolveRequestContext(req);
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canManageSystemFull) {
+      res.status(403).json({
+        valid: false,
+        error: 'Kontrol kunci enkripsi pusat hanya tersedia untuk Super Admin.',
+      });
+      return;
+    }
     const { pin, newPin } = req.body as { pin: string; newPin?: string };
     if (!pin || hashPin(pin) !== store.securityPinHash) {
       res.status(401).json({ valid: false, error: 'PIN keamanan penyelenggara salah.' });
@@ -2386,6 +2640,13 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
   });
 
   app.patch('/api/notification-rules', (req, res) => {
+    const { actor } = resolveRequestContext(req);
+    if (actor && !getRoleCapabilities(getAccessTier(actor)).canManageSystemFull) {
+      res.status(403).json({
+        error: 'Pengaturan integrasi & notifikasi pusat hanya tersedia untuk Super Admin.',
+      });
+      return;
+    }
     const rules = req.body as Partial<NotificationRules>;
     store.notificationRules = { ...store.notificationRules, ...rules };
     persistStore();

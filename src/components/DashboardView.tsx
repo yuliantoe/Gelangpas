@@ -1,27 +1,50 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowUpRight, QrCode, ShieldAlert, Users, Wallet } from 'lucide-react';
+import { ArrowUpRight, QrCode, ShieldAlert, ShieldCheck, Users, Wallet } from 'lucide-react';
+import { getRoleCapabilities, type AccessTier } from '../lib/permissions.ts';
 import type { AppStateSnapshot } from '../types/event.ts';
 
 interface DashboardViewProps {
   snapshot: AppStateSnapshot;
+  accessTier?: AccessTier;
+  assignedGate?: string;
   onNavigate: (tab: 'checkin' | 'ticketing' | 'designer' | 'visitors' | 'reports') => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNavigate }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({
+  snapshot,
+  accessTier = 'super-admin',
+  assignedGate,
+  onNavigate,
+}) => {
   const [hoveredHour, setHoveredHour] = useState<number | null>(null);
+  const caps = getRoleCapabilities(accessTier);
+  const isGateScoped =
+    accessTier === 'gate' && Boolean(assignedGate) && assignedGate !== 'Semua Gerbang';
 
   const stats = useMemo(() => {
-    const totalAttendees = snapshot.attendees.length;
-    const checkedInCount = snapshot.attendees.filter((a) => a.checkedIn).length;
-    const revokedCount = snapshot.attendees.filter((a) => a.revoked).length;
+    const scopedAttendees = isGateScoped && assignedGate
+      ? snapshot.attendees.filter((a) => a.gateAssigned === assignedGate)
+      : snapshot.attendees;
+    const scopedLogs = isGateScoped && assignedGate
+      ? snapshot.checkInLogs.filter((l) => l.gate === assignedGate)
+      : snapshot.checkInLogs;
+    const scopedGates = isGateScoped && assignedGate
+      ? snapshot.event.gates.filter((g) => g === assignedGate)
+      : snapshot.event.gates;
+
+    const totalAttendees = scopedAttendees.length;
+    const checkedInCount = scopedAttendees.filter((a) => a.checkedIn).length;
+    const revokedCount = scopedAttendees.filter((a) => a.revoked).length;
     const attendancePct = totalAttendees > 0 ? Math.round((checkedInCount / totalAttendees) * 100) : 0;
 
     const oneHourAgo = Date.now() - 3600 * 1000;
-    const recentVelocity = snapshot.checkInLogs.filter(
+    const recentVelocity = scopedLogs.filter(
       (l) => l.status === 'verified' && new Date(l.timestamp).getTime() >= oneHourAgo
     ).length;
 
-    const totalRevenue = snapshot.transactions.reduce((acc, tx) => acc + tx.amount, 0);
+    const totalRevenue = caps.canViewFinancialReports
+      ? snapshot.transactions.reduce((acc, tx) => acc + tx.amount, 0)
+      : 0;
 
     // Build 8-hour arrival flow buckets
     const now = new Date();
@@ -39,7 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
 
       let online = 0;
       let offline = 0;
-      snapshot.checkInLogs.forEach((log) => {
+      scopedLogs.forEach((log) => {
         if (log.status !== 'verified') return;
         const ts = new Date(log.timestamp).getTime();
         if (ts >= bucketStart.getTime() && ts < bucketEnd.getTime()) {
@@ -54,9 +77,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
     const maxBucket = Math.max(4, ...buckets.map((b) => b.total));
 
     // Gate breakdown
-    const gateStats = snapshot.event.gates.map((gate) => {
-      const assigned = snapshot.attendees.filter((a) => a.gateAssigned === gate).length;
-      const entered = snapshot.attendees.filter(
+    const gateStats = scopedGates.map((gate) => {
+      const assigned = scopedAttendees.filter((a) => a.gateAssigned === gate).length;
+      const entered = scopedAttendees.filter(
         (a) => a.checkedIn && a.checkedInGate === gate
       ).length;
       const pct = assigned > 0 ? Math.round((entered / assigned) * 100) : 0;
@@ -67,12 +90,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
     const tiers = Array.from(
       new Set([
         ...(snapshot.event.categories?.map((c) => c.name) || Object.keys(snapshot.event.ticketPrices)),
-        ...snapshot.attendees.map((a) => a.tier),
+        ...scopedAttendees.map((a) => a.tier),
       ])
     );
     const tierStats = tiers.map((tier) => {
-      const total = snapshot.attendees.filter((a) => a.tier === tier).length;
-      const checkedIn = snapshot.attendees.filter((a) => a.tier === tier && a.checkedIn).length;
+      const total = scopedAttendees.filter((a) => a.tier === tier).length;
+      const checkedIn = scopedAttendees.filter((a) => a.tier === tier && a.checkedIn).length;
       return { tier, total, checkedIn };
     });
 
@@ -87,8 +110,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
       maxBucket,
       gateStats,
       tierStats,
+      scopedLogs,
+      scopedGatesCount: scopedGates.length,
     };
-  }, [snapshot]);
+  }, [snapshot, isGateScoped, assignedGate, caps.canViewFinancialReports]);
 
   return (
     <div className="space-y-6">
@@ -145,23 +170,57 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
             <span className="text-xs text-slate-500">tamu / jam</span>
           </div>
           <p className="mt-2 text-xs text-slate-500">
-            Terpantau instan melalui {snapshot.event.gates.length} gerbang aktif
+            Terpantau instan melalui {stats.scopedGatesCount} gerbang aktif
           </p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Pendapatan Tiket Platform</span>
-            <Wallet className="w-4 h-4 text-slate-400" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="font-display text-2xl font-bold text-slate-900 tabular-nums">
-              Rp {stats.totalRevenue.toLocaleString('id-ID')}
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-slate-500 tabular-nums">
-            {snapshot.transactions.length} transaksi lunas · QRIS, VA & Loket
-          </p>
+          {caps.canViewFinancialReports ? (
+            <>
+              <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                <span>Pendapatan Tiket Platform</span>
+                <Wallet className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="font-display text-2xl font-bold text-slate-900 tabular-nums">
+                  Rp {stats.totalRevenue.toLocaleString('id-ID')}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500 tabular-nums">
+                {snapshot.transactions.length} transaksi lunas · QRIS, VA & Loket
+              </p>
+            </>
+          ) : accessTier === 'admin' ? (
+            <>
+              <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                <span>Mode Laporan Admin</span>
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="font-display text-xl font-bold text-slate-900">
+                  Operasional Penuh
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {stats.tierStats.length} kategori · Data finansial khusus Super Admin
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                <span>Gate / Zona Tugas Aktif</span>
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="font-display text-lg font-bold text-slate-900 truncate">
+                  {assignedGate || 'Semua Gerbang'}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Audit terbatas sesuai gate tugas
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -275,7 +334,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
             </div>
           </div>
 
-          <div className="mt-6 pt-5 border-t border-slate-200 grid grid-cols-2 gap-2.5">
+          <div className={`mt-6 pt-5 border-t border-slate-200 grid gap-2.5 ${caps.canManageSystemLimited ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <button
               type="button"
               onClick={() => onNavigate('checkin')}
@@ -283,13 +342,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
             >
               Buka Scanner Gerbang
             </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('designer')}
-              className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors whitespace-nowrap"
-            >
-              Desain Gelang QR
-            </button>
+            {caps.canManageSystemLimited && (
+              <button
+                type="button"
+                onClick={() => onNavigate('designer')}
+                className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors whitespace-nowrap"
+              >
+                Desain Gelang QR
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -327,7 +388,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {snapshot.checkInLogs.slice(0, 7).map((log) => (
+                {stats.scopedLogs.slice(0, 7).map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-6 font-mono text-slate-500 tabular-nums whitespace-nowrap">
                       {new Date(log.timestamp).toLocaleTimeString('id-ID', {
@@ -370,7 +431,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
                     </td>
                   </tr>
                 ))}
-                {snapshot.checkInLogs.length === 0 && (
+                {stats.scopedLogs.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-slate-500">
                       Belum ada aktivitas check-in tercatat.
@@ -399,7 +460,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ snapshot, onNaviga
                   <div>
                     <p className="font-medium text-slate-900">{t.tier}</p>
                     <p className="text-slate-500 tabular-nums mt-0.5">
-                      Rp {(snapshot.event.ticketPrices[t.tier] || 0).toLocaleString('id-ID')}
+                      {caps.canViewFinancialReports
+                        ? `Rp ${(snapshot.event.ticketPrices[t.tier] || 0).toLocaleString('id-ID')}`
+                        : 'Kategori Akses Gelang'}
                     </p>
                   </div>
                   <div className="text-right">

@@ -35,6 +35,7 @@ import { UsersManagementView } from './components/UsersManagementView.tsx';
 import { VisitorsView } from './components/VisitorsView.tsx';
 import { WristbandDesignerView } from './components/WristbandDesignerView.tsx';
 import { useEventSync } from './hooks/useEventSync.ts';
+import { getAccessTier, getAccessTierLabel, getRoleCapabilities } from './lib/permissions.ts';
 import type { PlatformUser } from './types/event.ts';
 
 type ActiveTab =
@@ -56,19 +57,37 @@ const NAV_ITEMS: Array<{
   id: ActiveTab;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  adminOnly?: boolean;
 }> = [
   { id: 'dashboard', label: 'Dasbor Analitik', icon: LayoutDashboard },
-  { id: 'events', label: 'Acara & Event', icon: CalendarPlus, adminOnly: true },
+  { id: 'events', label: 'Acara & Event', icon: CalendarPlus },
   { id: 'checkin', label: 'Terminal Check-In', icon: QrCode },
-  { id: 'designer', label: 'Desainer Gelang QR', icon: Palette, adminOnly: true },
+  { id: 'designer', label: 'Desainer Gelang QR', icon: Palette },
   { id: 'ticketing', label: 'Pembayaran & Loket', icon: CreditCard },
-  { id: 'categories', label: 'Kategori & Harga', icon: Tag, adminOnly: true },
+  { id: 'categories', label: 'Kategori & Harga', icon: Tag },
   { id: 'visitors', label: 'Data Pengunjung', icon: Users },
   { id: 'reports', label: 'Laporan Kehadiran', icon: FileSpreadsheet },
-  { id: 'users', label: 'Pengguna & Tim', icon: UserCog, adminOnly: true },
+  { id: 'users', label: 'Pengguna & Tim', icon: UserCog },
   { id: 'security', label: 'Enkripsi & Offline', icon: Shield },
 ];
+
+function canAccessTab(tab: ActiveTab, caps: ReturnType<typeof getRoleCapabilities>): boolean {
+  switch (tab) {
+    case 'dashboard':
+    case 'checkin':
+    case 'visitors':
+    case 'reports':
+      return true;
+    case 'events':
+    case 'designer':
+    case 'security':
+      return caps.canManageSystemLimited;
+    case 'ticketing':
+    case 'categories':
+      return caps.canManageAttendeesAndCategories;
+    case 'users':
+      return caps.canManageGateStaff;
+  }
+}
 
 export default function App() {
   const [showLanding, setShowLanding] = useState(true);
@@ -111,6 +130,7 @@ export default function App() {
     checkoutTicket,
     batchCreateAttendees,
     toggleAttendeeRevoked,
+    reissueAttendee,
     saveDesign,
     createEvent,
     activateEvent,
@@ -190,12 +210,8 @@ export default function App() {
         onEnterDashboard={(tab) => {
           const requestedTab = tab || 'dashboard';
           if (authenticatedUser) {
-            const targetItem = NAV_ITEMS.find((i) => i.id === requestedTab);
-            if (targetItem?.adminOnly && authenticatedUser.role !== 'administrator') {
-              setActiveTab('checkin');
-            } else {
-              setActiveTab(requestedTab);
-            }
+            const userCaps = getRoleCapabilities(getAccessTier(authenticatedUser));
+            setActiveTab(canAccessTab(requestedTab, userCaps) ? requestedTab : 'checkin');
           } else {
             setPendingTab(requestedTab);
           }
@@ -225,13 +241,10 @@ export default function App() {
           } else if (!user.isOwner && !user.assignedEventIds?.includes('*') && user.assignedEventIds?.[0]) {
             setSessionEvent(user.assignedEventIds[0]);
           }
-          const candidate = pendingTab || (user.role === 'administrator' ? 'dashboard' : 'checkin');
-          const targetItem = NAV_ITEMS.find((i) => i.id === candidate);
-          if (targetItem?.adminOnly && user.role !== 'administrator') {
-            setActiveTab('checkin');
-          } else {
-            setActiveTab(candidate);
-          }
+          const userTier = getAccessTier(user);
+          const userCaps = getRoleCapabilities(userTier);
+          const candidate = pendingTab || (userTier !== 'gate' ? 'dashboard' : 'checkin');
+          setActiveTab(canAccessTab(candidate, userCaps) ? candidate : 'checkin');
           setPendingTab(null);
         }}
       />
@@ -239,9 +252,10 @@ export default function App() {
   }
 
   const currentUser = authenticatedUser;
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) => currentUser.role === 'administrator' || !item.adminOnly
-  );
+  const accessTier = getAccessTier(currentUser);
+  const caps = getRoleCapabilities(accessTier);
+  const accessTierLabel = getAccessTierLabel(accessTier);
+  const visibleNavItems = NAV_ITEMS.filter((item) => canAccessTab(item.id, caps));
   const effectiveActiveTab =
     visibleNavItems.some((item) => item.id === activeTab) ? activeTab : visibleNavItems[0].id;
 
@@ -306,10 +320,14 @@ export default function App() {
               <span className="text-slate-500">Akun Login</span>
               <span
                 className={`font-semibold ${
-                  currentUser.role === 'administrator' ? 'text-blue-700' : 'text-emerald-700'
+                  accessTier === 'super-admin'
+                    ? 'text-indigo-700'
+                    : accessTier === 'admin'
+                      ? 'text-blue-700'
+                      : 'text-emerald-700'
                 }`}
               >
-                {currentUser.role === 'administrator' ? 'Administrator' : 'User'}
+                {accessTierLabel}
               </span>
             </div>
             <div className="min-w-0">
@@ -361,7 +379,7 @@ export default function App() {
                   </span>
                 )}
               </span>
-              {currentUser.role === 'administrator' && (
+              {caps.canManageSystemFull && (
                 <button
                   type="button"
                   onClick={() => handleNavClick('events')}
@@ -422,10 +440,14 @@ export default function App() {
                   <span className="font-semibold text-slate-900 truncate">{currentUser.fullName}</span>
                   <span
                     className={`text-[11px] font-semibold ${
-                      currentUser.role === 'administrator' ? 'text-blue-700' : 'text-emerald-700'
+                      accessTier === 'super-admin'
+                        ? 'text-indigo-700'
+                        : accessTier === 'admin'
+                          ? 'text-blue-700'
+                          : 'text-emerald-700'
                     }`}
                   >
-                    {currentUser.role === 'administrator' ? 'Admin' : 'User'}
+                    {accessTierLabel}
                   </span>
                 </div>
                 <button
@@ -484,13 +506,15 @@ export default function App() {
             {/* Real Connectivity & Offline Sync Indicator */}
             <button
               type="button"
-              onClick={() => setActiveTab('security')}
+              onClick={() => {
+                if (caps.canManageSystemLimited) setActiveTab('security');
+              }}
               className={`hidden sm:inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 isOnline
                   ? 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
               }`}
-              title="Kelola mode offline & enkripsi"
+              title={caps.canManageSystemLimited ? 'Kelola mode offline & enkripsi' : 'Status sinkronisasi jaringan'}
             >
               {isOnline ? (
                 <Wifi
@@ -533,13 +557,15 @@ export default function App() {
             </button>
 
             {/* Primary CTA */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('ticketing')}
-              className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors whitespace-nowrap shrink-0"
-            >
-              + Jual Tiket
-            </button>
+            {caps.canManageAttendeesAndCategories && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('ticketing')}
+                className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors whitespace-nowrap shrink-0"
+              >
+                + Jual Tiket
+              </button>
+            )}
           </div>
         </header>
 
@@ -571,12 +597,18 @@ export default function App() {
         {/* Active Page Viewport */}
         <main key={snapshot.event.id} className="flex-1 p-4 sm:p-6 max-w-[1400px] w-full mx-auto">
           {effectiveActiveTab === 'dashboard' && (
-            <DashboardView snapshot={snapshot} onNavigate={handleNavClick} />
+            <DashboardView
+              snapshot={snapshot}
+              accessTier={accessTier}
+              assignedGate={currentUser.assignedGate}
+              onNavigate={handleNavClick}
+            />
           )}
           {effectiveActiveTab === 'events' && (
             <EventManagementView
               snapshot={snapshot}
               currentRole={currentUser.role}
+              accessTier={accessTier}
               currentOrganizationName={currentUser.organizationName}
               onCreateEvent={async (input) => {
                 const res = await createEvent(input);
@@ -602,6 +634,7 @@ export default function App() {
               pendingCount={pendingCount}
               syncing={syncing}
               defaultGate={currentUser.assignedGate}
+              accessTier={accessTier}
               onSyncNow={syncNow}
               onCheckIn={performCheckIn}
             />
@@ -613,7 +646,7 @@ export default function App() {
             <TicketingPaymentView
               snapshot={snapshot}
               isOnline={isOnline}
-              canEditCategories={currentUser.role === 'administrator'}
+              canEditCategories={caps.canManageAttendeesAndCategories}
               onEditCategories={() => setActiveTab('categories')}
               onCheckout={checkoutTicket}
             />
@@ -628,12 +661,21 @@ export default function App() {
           {effectiveActiveTab === 'visitors' && (
             <VisitorsView
               snapshot={snapshot}
+              accessTier={accessTier}
+              assignedGate={currentUser.assignedGate}
               onCheckIn={performCheckIn}
               onToggleRevoked={toggleAttendeeRevoked}
+              onReissueWristband={reissueAttendee}
               onBatchCreate={batchCreateAttendees}
             />
           )}
-          {effectiveActiveTab === 'reports' && <ReportsView snapshot={snapshot} />}
+          {effectiveActiveTab === 'reports' && (
+            <ReportsView
+              snapshot={snapshot}
+              accessTier={accessTier}
+              assignedGate={currentUser.assignedGate}
+            />
+          )}
           {effectiveActiveTab === 'users' && (
             <UsersManagementView
               snapshot={{ ...snapshot, users: usersList }}
@@ -647,7 +689,9 @@ export default function App() {
           {effectiveActiveTab === 'security' && (
             <SecurityOfflineView
               snapshot={snapshot}
+              currentUserId={currentUser.id}
               currentRole={currentUser.role}
+              accessTier={accessTier}
               browserOnline={browserOnline}
               simulatedOffline={simulatedOffline}
               setSimulatedOffline={setSimulatedOffline}

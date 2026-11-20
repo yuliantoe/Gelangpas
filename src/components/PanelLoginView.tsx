@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Building2,
   CalendarPlus,
+  Crown,
   Eye,
   EyeOff,
   Lock,
@@ -10,7 +11,13 @@ import {
   UserCheck,
   WifiOff,
 } from 'lucide-react';
-import type { AppStateSnapshot, EventInfo, PlatformUser, UserRole } from '../types/event.ts';
+import type {
+  AppStateSnapshot,
+  EventInfo,
+  LoginRoleMenu,
+  PlatformUser,
+  UserRole,
+} from '../types/event.ts';
 
 interface PanelLoginViewProps {
   snapshot: AppStateSnapshot;
@@ -20,6 +27,7 @@ interface PanelLoginViewProps {
     email: string;
     password: string;
     expectedRole: UserRole;
+    expectedLoginMenu: LoginRoleMenu;
   }) => Promise<{ user: PlatformUser; recommendedEventId?: string }>;
   onRegisterOrganizer: (input: {
     organizerName: string;
@@ -52,21 +60,38 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
   );
 
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('administrator');
+  const [selectedMenu, setSelectedMenu] = useState<LoginRoleMenu>('administrator');
   const [eventFilterId, setEventFilterId] = useState<string>('all');
 
+  const isAllAccessAdmin = (u: PlatformUser) =>
+    u.role === 'administrator' && Boolean(u.isOwner || u.assignedEventIds?.includes('*'));
+
+  const matchesMenuTier = (u: PlatformUser, menu: LoginRoleMenu) => {
+    if (menu === 'administrator') return isAllAccessAdmin(u);
+    if (menu === 'admin') return u.role === 'administrator' && !isAllAccessAdmin(u);
+    return u.role === 'user';
+  };
+
+  const selectedRole: UserRole = selectedMenu === 'user' ? 'user' : 'administrator';
+  const menuLabel =
+    selectedMenu === 'administrator'
+      ? 'Super Admin'
+      : selectedMenu === 'admin'
+        ? 'Admin'
+        : 'Sistem Cek (Gate)';
+
   const roleUsers = useMemo(() => {
-    const byRole = activeUsers.filter((u) => u.role === selectedRole);
-    if (eventFilterId === 'all') return byRole;
-    return byRole.filter(
+    const byMenu = activeUsers.filter((u) => matchesMenuTier(u, selectedMenu));
+    if (eventFilterId === 'all') return byMenu;
+    return byMenu.filter(
       (u) => u.isOwner || u.assignedEventIds?.includes('*') || u.assignedEventIds?.includes(eventFilterId)
     );
-  }, [activeUsers, selectedRole, eventFilterId]);
+  }, [activeUsers, selectedMenu, eventFilterId]);
 
   // Login State
   const [email, setEmail] = useState(
     () =>
-      activeUsers.find((u) => u.role === 'administrator')?.email ||
+      activeUsers.find((u) => matchesMenuTier(u, 'administrator'))?.email ||
       'idmonggo@gmail.com'
   );
   const [password, setPassword] = useState('');
@@ -87,7 +112,7 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
 
   const describeUserEvents = (u: PlatformUser) => {
     if (u.isOwner || u.assignedEventIds?.includes('*')) {
-      return 'Semua Event (Pemilik Platform)';
+      return 'Akses Semua (Semua Event & Gerbang)';
     }
     const names = (u.assignedEventIds || [])
       .map((evId) => eventsList.find((e) => e.id === evId)?.title)
@@ -95,15 +120,15 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
     return names.length > 0 ? names.join(', ') : snapshot.event.title;
   };
 
-  const handleRoleTab = (role: UserRole) => {
-    setSelectedRole(role);
+  const handleMenuTab = (menu: LoginRoleMenu) => {
+    setSelectedMenu(menu);
     setErrorMsg(null);
     const pool = activeUsers.filter((u) => {
-      if (u.role !== role) return false;
+      if (!matchesMenuTier(u, menu)) return false;
       if (eventFilterId === 'all') return true;
       return u.isOwner || u.assignedEventIds?.includes('*') || u.assignedEventIds?.includes(eventFilterId);
     });
-    const firstMatch = pool[0] || activeUsers.find((u) => u.role === role);
+    const firstMatch = pool[0] || activeUsers.find((u) => matchesMenuTier(u, menu));
     setEmail(firstMatch ? firstMatch.email : '');
     setPassword('');
   };
@@ -122,6 +147,7 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
         email: email.trim(),
         password,
         expectedRole: selectedRole,
+        expectedLoginMenu: selectedMenu,
       });
       const targetEv =
         eventFilterId !== 'all' &&
@@ -229,8 +255,8 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
             </h1>
             <p className="text-sm text-[#3F4668]">
               {authMode === 'login'
-                ? 'Masuk sebagai Administrator atau User sesuai penyelenggara event yang Anda kelola.'
-                : 'Buat ruang kerja penyelenggara baru beserta acara pertama dan akun Administrator-nya.'}
+                ? 'Masuk sebagai Super Admin, Admin, atau Sistem Cek (Gate) sesuai hak akses Anda.'
+                : 'Buat ruang kerja penyelenggara baru beserta acara pertama dan akun Admin-nya.'}
             </p>
           </div>
 
@@ -274,49 +300,71 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
 
           {authMode === 'login' ? (
             <>
-              {/* Role Mode Switch */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* 3-Tier Role Mode Switch: Super Admin, Admin, Sistem Cek (Gate) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => handleRoleTab('administrator')}
-                  className={`p-3.5 rounded-2xl border-2 text-left transition-colors cursor-pointer ${
-                    selectedRole === 'administrator'
+                  onClick={() => handleMenuTab('administrator')}
+                  className={`p-3 rounded-2xl border-2 text-left transition-colors cursor-pointer ${
+                    selectedMenu === 'administrator'
+                      ? 'border-[#2B3BFF] bg-[#2B3BFF]/5'
+                      : 'border-[#D5DBEC] hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-[#0E1330]">
+                    <Crown
+                      className={`w-4 h-4 shrink-0 ${
+                        selectedMenu === 'administrator' ? 'text-[#2B3BFF]' : 'text-[#3F4668]'
+                      }`}
+                    />
+                    <span className="font-display text-sm font-bold">Super Admin</span>
+                  </div>
+                  <p className="text-[11px] text-[#3F4668] mt-1 leading-snug">
+                    Akses penuh sistem, kelola Admin &amp; laporan finansial
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleMenuTab('admin')}
+                  className={`p-3 rounded-2xl border-2 text-left transition-colors cursor-pointer ${
+                    selectedMenu === 'admin'
                       ? 'border-[#2B3BFF] bg-[#2B3BFF]/5'
                       : 'border-[#D5DBEC] hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center gap-2 text-[#0E1330]">
                     <Shield
-                      className={`w-4 h-4 ${
-                        selectedRole === 'administrator' ? 'text-[#2B3BFF]' : 'text-[#3F4668]'
+                      className={`w-4 h-4 shrink-0 ${
+                        selectedMenu === 'admin' ? 'text-[#2B3BFF]' : 'text-[#3F4668]'
                       }`}
                     />
-                    <span className="font-display text-sm font-bold">Administrator</span>
+                    <span className="font-display text-sm font-bold">Admin</span>
                   </div>
-                  <p className="text-[11px] text-[#3F4668] mt-1">
-                    Kelola acara, tim penyelenggara, harga &amp; desain gelang
+                  <p className="text-[11px] text-[#3F4668] mt-1 leading-snug">
+                    Kelola peserta, kategori, Petugas Cek &amp; laporan operasional
                   </p>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleRoleTab('user')}
-                  className={`p-3.5 rounded-2xl border-2 text-left transition-colors cursor-pointer ${
-                    selectedRole === 'user'
+                  onClick={() => handleMenuTab('user')}
+                  className={`p-3 rounded-2xl border-2 text-left transition-colors cursor-pointer ${
+                    selectedMenu === 'user'
                       ? 'border-[#2B3BFF] bg-[#2B3BFF]/5'
                       : 'border-[#D5DBEC] hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center gap-2 text-[#0E1330]">
                     <UserCheck
-                      className={`w-4 h-4 ${
-                        selectedRole === 'user' ? 'text-[#2B3BFF]' : 'text-[#3F4668]'
+                      className={`w-4 h-4 shrink-0 ${
+                        selectedMenu === 'user' ? 'text-[#2B3BFF]' : 'text-[#3F4668]'
                       }`}
                     />
-                    <span className="font-display text-sm font-bold">User</span>
+                    <span className="font-display text-sm font-bold">Sistem Cek (Gate)</span>
                   </div>
-                  <p className="text-[11px] text-[#3F4668] mt-1">
-                    Petugas check-in gerbang, loket &amp; pantau pengunjung acara
+                  <p className="text-[11px] text-[#3F4668] mt-1 leading-snug">
+                    Scan/validasi gelang sesuai gate &amp; log gate sendiri
                   </p>
                 </button>
               </div>
@@ -324,7 +372,7 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="login-email" className="block text-xs font-semibold text-[#0E1330] mb-1.5">
-                    Email Akun {selectedRole === 'administrator' ? 'Administrator' : 'User'}
+                    Email Akun {menuLabel}
                   </label>
                   <input
                     id="login-email"
@@ -333,9 +381,11 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={
-                      selectedRole === 'administrator'
-                        ? 'idmonggo@gmail.com'
-                        : 'fauzan.gate@gelangpass.id'
+                      selectedMenu === 'administrator'
+                        ? 'admin.semua@gelangpass.id'
+                        : selectedMenu === 'admin'
+                          ? 'nadira.admin@gelangpass.id'
+                          : 'fauzan.gate@gelangpass.id'
                     }
                     className="w-full rounded-xl border border-[#D5DBEC] bg-white px-3.5 py-2.5 text-sm text-[#0E1330] focus:outline-none focus:ring-2 focus:ring-[#2B3BFF]"
                   />
@@ -353,9 +403,9 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder={
-                        selectedRole === 'administrator'
-                          ? 'Masukkan kata sandi Administrator (default: admin2026)'
-                          : 'Masukkan kata sandi User (default: user2026)'
+                        selectedMenu === 'user'
+                          ? 'Masukkan kata sandi User (default: user2026)'
+                          : `Masukkan kata sandi ${menuLabel} (default: admin2026)`
                       }
                       className="w-full rounded-xl border border-[#D5DBEC] bg-white pl-3.5 pr-10 py-2.5 text-sm text-[#0E1330] focus:outline-none focus:ring-2 focus:ring-[#2B3BFF]"
                     />
@@ -369,9 +419,9 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
                     </button>
                   </div>
                   <p className="text-[11px] text-[#3F4668] mt-1.5">
-                    Kata sandi bawaan akun contoh:{' '}
+                    Kata sandi bawaan akun {menuLabel}:{' '}
                     <code className="font-mono font-semibold text-[#0E1330]">
-                      {selectedRole === 'administrator' ? 'admin2026' : 'user2026'}
+                      {selectedMenu === 'user' ? 'user2026' : 'admin2026'}
                     </code>
                   </p>
                 </div>
@@ -385,17 +435,17 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
                   <span>
                     {submitting
                       ? 'Memverifikasi Akun...'
-                      : `Masuk sebagai ${selectedRole === 'administrator' ? 'Administrator' : 'User'}`}
+                      : `Masuk sebagai ${menuLabel}`}
                   </span>
                 </button>
               </form>
 
-              {/* Registered Quick-Fill Accounts Scoped by Event Organizer */}
-              {activeUsers.some((u) => u.role === selectedRole) && (
+              {/* Registered Quick-Fill Accounts Filtered by Administrator / Admin / User */}
+              {activeUsers.some((u) => matchesMenuTier(u, selectedMenu)) && (
                 <div className="pt-4 border-t border-[#D5DBEC] space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[11px] font-semibold text-[#3F4668]">
-                      Akun {selectedRole === 'administrator' ? 'Administrator' : 'User'} terdaftar:
+                      Akun {menuLabel} terdaftar:
                     </p>
                     {eventsList.length > 1 && (
                       <select
@@ -438,7 +488,7 @@ export const PanelLoginView: React.FC<PanelLoginViewProps> = ({
                     ))}
                     {roleUsers.length === 0 && (
                       <p className="text-xs text-[#3F4668] py-2">
-                        Belum ada akun {selectedRole === 'administrator' ? 'Administrator' : 'User'} pada acara ini.
+                        Belum ada akun {menuLabel} pada acara ini.
                       </p>
                     )}
                   </div>

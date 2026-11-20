@@ -25,6 +25,8 @@ import {
   WristbandPreview,
   downloadBatchWristbandsPng,
   downloadWristbandPng,
+  formatWristbandDimensionLabel,
+  getExportDimensions,
 } from './WristbandPreview.tsx';
 
 interface WristbandDesignerViewProps {
@@ -324,7 +326,7 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
       const resultUrl = reader.result as string;
       const img = new Image();
       img.onload = () => {
-        const maxWidth = 1400;
+        const maxWidth = 2240;
         const maxHeight = 560;
         const scale = Math.min(1, maxWidth / img.width, maxHeight / img.height);
         const canvas = document.createElement('canvas');
@@ -481,7 +483,7 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
               <label className="text-xs font-semibold text-slate-700">
                 Upload Desain Gelang Kustom (Latar Penuh)
               </label>
-              <span className="text-[11px] font-mono text-slate-500">1600×340 px</span>
+              <span className="text-[11px] font-mono text-slate-500">2,2 × 28 cm (2800×220 px)</span>
             </div>
 
             {!draft.customBackgroundDataUrl ? (
@@ -786,23 +788,15 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
 
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-                Lebar Pita
+                Ukuran Gelang
               </label>
-              <div className="flex rounded-lg border border-slate-300 p-0.5 bg-slate-50">
-                {([19, 25] as const).map((mm) => (
-                  <button
-                    key={mm}
-                    type="button"
-                    onClick={() => setDraft({ ...draft, widthMm: mm })}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      draft.widthMm === mm
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-600'
-                    }`}
-                  >
-                    {mm} mm
-                  </button>
-                ))}
+              <div className="rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-900">
+                  {formatWristbandDimensionLabel(draft)}
+                </span>
+                <span className="font-mono text-[11px] text-blue-700">
+                  {draft.widthMm} × {(draft.lengthCm ?? 28) * 10} mm
+                </span>
               </div>
             </div>
           </div>
@@ -966,7 +960,8 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
                 />
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
                   <span>
-                    Dimensi ekspor: 1600 px ·{' '}
+                    Dimensi ekspor: {getExportDimensions(draft).width}×{getExportDimensions(draft).height} px (
+                    {formatWristbandDimensionLabel(draft)}) ·{' '}
                     {TICKET_PREVIEW_LAYOUT_OPTIONS.find(
                       (o) => o.id === (draft.previewLayout ?? 'wristband')
                     )?.label || 'Gelang Pita QR'}
@@ -1056,7 +1051,7 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
                         )}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                        {d.themePreset} · {d.widthMm}mm
+                        {d.themePreset} · {formatWristbandDimensionLabel(d)}
                       </p>
                     </div>
                     {d.customBackgroundDataUrl ? (
@@ -1281,7 +1276,7 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
                           {snapshot.event.title} — Lembar Cetak Gelang Tiket
                         </h4>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Desain: {draft.name} ({draft.themePreset} · {draft.widthMm}mm) · Enkripsi AES-256-GCM v{snapshot.event.encryptionKeyVersion}
+                          Desain: {draft.name} ({draft.themePreset} · {formatWristbandDimensionLabel(draft)}) · Enkripsi AES-256-GCM v{snapshot.event.encryptionKeyVersion}
                         </p>
                       </div>
                       <span className="font-mono text-xs text-slate-600 tabular-nums">
@@ -1394,7 +1389,7 @@ export const WristbandDesignerView: React.FC<WristbandDesignerViewProps> = ({
           <div className="mb-4 border-b border-slate-300 pb-2">
             <h1 className="text-lg font-bold">{snapshot.event.title} — Lembar Cetak Gelang Tiket</h1>
             <p className="text-xs text-slate-600">
-              Desain: {draft.name} ({draft.themePreset} · {draft.widthMm}mm) · Enkripsi AES-256-GCM v{snapshot.event.encryptionKeyVersion}
+              Desain: {draft.name} ({draft.themePreset} · {formatWristbandDimensionLabel(draft)}) · Enkripsi AES-256-GCM v{snapshot.event.encryptionKeyVersion}
             </p>
           </div>
         )}

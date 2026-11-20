@@ -24,7 +24,7 @@ export const TICKET_PREVIEW_LAYOUT_OPTIONS: Array<{
   {
     id: 'wristband',
     label: 'Gelang Pita QR',
-    description: 'Strip gelang acara 19 / 25 mm standar',
+    description: 'Strip gelang acara standar 2,2 cm × 28 cm (22 × 280 mm)',
   },
   {
     id: 'concert-ticket',
@@ -78,6 +78,17 @@ function getMaterialLabel(material: WristbandDesign['material']): string {
 
 function formatRupiah(amount: number): string {
   return amount > 0 ? `Rp ${amount.toLocaleString('id-ID')}` : 'Gratis / Undangan';
+}
+
+export function formatWristbandDimensionLabel(design: WristbandDesign): string {
+  const widthCm = (design.widthMm / 10).toLocaleString('id-ID', {
+    minimumFractionDigits: design.widthMm % 10 === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
+  });
+  const lengthCm = (design.lengthCm ?? 28).toLocaleString('id-ID', {
+    maximumFractionDigits: 1,
+  });
+  return `${widthCm} cm × ${lengthCm} cm`;
 }
 
 function getShortCode(text: string, fallback: string): string {
@@ -745,18 +756,40 @@ export const WristbandPreview: React.FC<WristbandPreviewProps> = ({
     );
   }
 
-  // 4. DEFAULT WRISTBAND LAYOUT (Gelang Pita QR)
-  const heightPx = design.widthMm === 25 ? (compact ? 112 : 144) : compact ? 92 : 118;
-  const qrSize = design.widthMm === 25 ? (compact ? 78 : 102) : compact ? 66 : 84;
-  const logoSize = compact ? 38 : 48;
+  // 4. DEFAULT WRISTBAND LAYOUT (Gelang Pita QR · 2,2 cm × 28 cm)
+  const heightPx =
+    design.widthMm === 25
+      ? compact
+        ? 110
+        : 136
+      : design.widthMm === 22
+      ? compact
+        ? 98
+        : 114
+      : compact
+      ? 90
+      : 108;
+  const qrSize =
+    design.widthMm === 25
+      ? compact
+        ? 78
+        : 98
+      : design.widthMm === 22
+      ? compact
+        ? 72
+        : 84
+      : compact
+      ? 64
+      : 78;
+  const logoSize = compact ? 34 : 44;
 
   return (
     <div className="w-full overflow-x-auto pb-1">
       <div
         className="relative flex items-center justify-between rounded-xl overflow-hidden border border-slate-300/60 select-none shadow-sm mx-auto"
         style={{
-          minWidth: compact ? 540 : 660,
-          maxWidth: 780,
+          minWidth: compact ? 620 : 740,
+          maxWidth: 880,
           height: heightPx,
           background: `linear-gradient(100deg, ${design.primaryColor} 0%, ${design.secondaryColor} 100%)`,
           color: design.textColor,
@@ -815,9 +848,9 @@ export const WristbandPreview: React.FC<WristbandPreviewProps> = ({
         </div>
 
         {/* Event Brand & Holder Details */}
-        <div className="relative z-10 flex-1 px-5 py-2.5 flex flex-col justify-between h-full min-w-0">
+        <div className="relative z-10 flex-1 px-4 sm:px-5 py-1.5 flex flex-col justify-between h-full min-w-0">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               {design.brandLogoDataUrl && (
                 <div
                   className="rounded-lg bg-white/95 p-1 flex items-center justify-center shrink-0 shadow-sm border border-black/10"
@@ -831,12 +864,12 @@ export const WristbandPreview: React.FC<WristbandPreviewProps> = ({
                 </div>
               )}
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[11px] font-medium opacity-85 truncate">
+                <div className="flex items-center gap-1.5 text-[10px] font-medium opacity-85 truncate">
                   <span>{design.sponsorLabel || 'GelangPass'}</span>
                   <span aria-hidden="true">·</span>
                   <span>{event.dateLabel}</span>
                 </div>
-                <h4 className="font-display font-bold tracking-tight text-base md:text-lg leading-tight truncate mt-0.5">
+                <h4 className="font-display font-bold tracking-tight text-sm md:text-base leading-tight truncate">
                   {event.title}
                 </h4>
               </div>
@@ -844,7 +877,7 @@ export const WristbandPreview: React.FC<WristbandPreviewProps> = ({
 
             {design.showTierBadge && (
               <div
-                className="px-2.5 py-1 rounded text-xs font-bold tracking-wide shrink-0"
+                className="px-2.5 py-0.5 rounded text-[11px] font-bold tracking-wide shrink-0"
                 style={{
                   backgroundColor: design.accentColor,
                   color: '#0F172A',
@@ -858,22 +891,22 @@ export const WristbandPreview: React.FC<WristbandPreviewProps> = ({
           <div className="flex items-end justify-between gap-4">
             <div className="min-w-0">
               {design.showHolderName && (
-                <p className="text-xs md:text-sm font-semibold truncate">
+                <p className="text-xs font-semibold leading-tight truncate">
                   {attendee.fullName}
                 </p>
               )}
-              <p className="text-[11px] opacity-80 truncate">
+              <p className="text-[10px] opacity-80 leading-tight truncate mt-0.5">
                 {design.customTagline} · {attendee.gateAssigned}
               </p>
               {design.showSecurityMicrotext && (
-                <p className="font-mono text-[10px] opacity-75 mt-0.5 tracking-wider truncate">
+                <p className="font-mono text-[9px] opacity-75 leading-tight tracking-wider truncate mt-0.5">
                   AES-256-GCM · {attendee.ticketCode}
                 </p>
               )}
             </div>
             <div className="text-right shrink-0 hidden sm:block">
-              <span className="text-[10px] opacity-75 block">
-                {getMaterialLabel(design.material)} · {design.widthMm}mm
+              <span className="text-[10px] opacity-80 block">
+                {getMaterialLabel(design.material)} · {formatWristbandDimensionLabel(design)}
               </span>
             </div>
           </div>
@@ -993,20 +1026,31 @@ function drawVerticalBarcodeCanvas(
   }
 }
 
-export function getExportHeightForDesign(design: WristbandDesign): number {
+export function getExportDimensions(design: WristbandDesign): {
+  width: number;
+  height: number;
+} {
   const layout = design.previewLayout ?? 'wristband';
   switch (layout) {
     case 'concert-ticket':
-      return 500;
+      return { width: 1600, height: 500 };
     case 'boarding-pass':
-      return 500;
+      return { width: 1600, height: 500 };
     case 'gallery-pass':
-      return 460;
+      return { width: 1600, height: 460 };
     case 'invitation-card':
-      return 520;
-    default:
-      return design.widthMm === 25 ? 340 : 280;
+      return { width: 1600, height: 520 };
+    default: {
+      // Exact 2,2 cm × 28 cm (22 × 280 mm) scale at 100 px/cm = 2800 × 220 px
+      const widthPx = Math.round((design.lengthCm ?? 28) * 100);
+      const heightPx = Math.round(design.widthMm * 10);
+      return { width: widthPx, height: heightPx };
+    }
   }
+}
+
+export function getExportHeightForDesign(design: WristbandDesign): number {
+  return getExportDimensions(design).height;
 }
 
 async function renderWristbandCanvas(
@@ -1015,8 +1059,7 @@ async function renderWristbandCanvas(
   attendee: Attendee
 ): Promise<HTMLCanvasElement> {
   const layout = design.previewLayout ?? 'wristband';
-  const width = 1600;
-  const height = getExportHeightForDesign(design);
+  const { width, height } = getExportDimensions(design);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -1579,7 +1622,7 @@ async function renderWristbandCanvas(
     return canvas;
   }
 
-  // 4. DEFAULT WRISTBAND CANVAS RENDER
+  // 4. DEFAULT WRISTBAND CANVAS RENDER (2,2 cm × 28 cm · 2800 × 220 px)
   const grad = ctx.createLinearGradient(0, 0, width, height);
   grad.addColorStop(0, design.primaryColor);
   grad.addColorStop(1, design.secondaryColor);
@@ -1590,20 +1633,21 @@ async function renderWristbandCanvas(
   if (shouldDrawPattern) drawPatternOnCanvas(ctx, design, 0, 0, width, height);
 
   // Left clasp zone
+  const leftZoneW = 120;
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.fillRect(0, 0, 110, height);
+  ctx.fillRect(0, 0, leftZoneW, height);
   ctx.fillStyle = '#F1F5F9';
   ctx.beginPath();
-  ctx.arc(55, height * 0.35, 14, 0, Math.PI * 2);
-  ctx.arc(55, height * 0.65, 14, 0, Math.PI * 2);
+  ctx.arc(leftZoneW / 2, height * 0.34, 12, 0, Math.PI * 2);
+  ctx.arc(leftZoneW / 2, height * 0.66, 12, 0, Math.PI * 2);
   ctx.fill();
 
   // Brand Logo if uploaded
-  let textStartX = 150;
+  let textStartX = leftZoneW + 44;
   if (logoImg) {
-    const boxSize = design.widthMm === 25 ? 104 : 86;
-    const boxX = 148;
-    const boxY = 34;
+    const boxSize = Math.min(96, height - 44);
+    const boxX = leftZoneW + 38;
+    const boxY = Math.round((height - boxSize) / 2);
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.beginPath();
     ctx.roundRect(boxX, boxY, boxSize, boxSize, 14);
@@ -1621,70 +1665,107 @@ async function renderWristbandCanvas(
       drawW,
       drawH
     );
-    textStartX = boxX + boxSize + 24;
+    textStartX = boxX + boxSize + 28;
   }
 
   // Text block
   ctx.fillStyle = design.textColor;
-  ctx.font = '600 22px "Plus Jakarta Sans", sans-serif';
+  ctx.font = '600 18px "Plus Jakarta Sans", sans-serif';
   ctx.globalAlpha = 0.85;
-  ctx.fillText(`${design.sponsorLabel || 'GelangPass'}  ·  ${event.dateLabel}`, textStartX, 66);
+  ctx.fillText(`${design.sponsorLabel || 'GelangPass'}  ·  ${event.dateLabel}`, textStartX, 44);
   ctx.globalAlpha = 1;
 
-  ctx.font = '800 42px "Plus Jakarta Sans", sans-serif';
-  ctx.fillText(event.title, textStartX, 122);
+  ctx.font = '800 34px "Plus Jakarta Sans", sans-serif';
+  ctx.fillText(event.title, textStartX, 86);
 
   if (design.showHolderName) {
-    ctx.font = '700 30px "DM Sans", sans-serif';
-    ctx.fillText(attendee.fullName, 150, height - 92);
+    ctx.font = '700 26px "DM Sans", sans-serif';
+    ctx.fillText(attendee.fullName, textStartX, height - 86);
   }
 
-  ctx.font = '500 22px "DM Sans", sans-serif';
+  ctx.font = '500 19px "DM Sans", sans-serif';
   ctx.globalAlpha = 0.85;
-  ctx.fillText(`${design.customTagline}  ·  ${attendee.gateAssigned}`, 150, height - 56);
+  ctx.fillText(`${design.customTagline}  ·  ${attendee.gateAssigned}`, textStartX, height - 54);
   ctx.globalAlpha = 1;
 
   if (design.showSecurityMicrotext) {
-    ctx.font = '600 18px "JetBrains Mono", monospace';
+    ctx.font = '600 16px "JetBrains Mono", monospace';
     ctx.globalAlpha = 0.8;
-    ctx.fillText(`AES-256-GCM  ·  ${attendee.ticketCode}`, 150, height - 26);
+    ctx.fillText(`AES-256-GCM  ·  ${attendee.ticketCode}`, textStartX, height - 24);
     ctx.globalAlpha = 1;
   }
 
-  // Tier box
-  if (design.showTierBadge) {
-    ctx.fillStyle = design.accentColor;
-    ctx.fillRect(980, 44, 170, 52);
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 26px "Plus Jakarta Sans", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(attendee.tier, 1065, 79);
-    ctx.textAlign = 'left';
-  }
+  // Right Fastener Zone
+  const rightZoneW = 90;
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(width - rightZoneW, 0, rightZoneW, height);
+  ctx.fillStyle = '#F1F5F9';
+  ctx.beginPath();
+  ctx.arc(width - rightZoneW / 2, height / 2, 12, 0, Math.PI * 2);
+  ctx.fill();
 
-  // Perforation line
-  if (design.showPerforation) {
-    ctx.save();
-    ctx.setLineDash([10, 10]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(1185, 0);
-    ctx.lineTo(1185, height);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // QR Box
-  const qrBoxSize = height - 56;
-  const qrX = 1220;
-  const qrY = 28;
+  // QR Box & Vertical Code
+  const qrBoxSize = height - 32;
+  const qrX = width - rightZoneW - qrBoxSize - 68;
+  const qrY = 16;
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(qrX, qrY, qrBoxSize, qrBoxSize);
 
   if (qrImg) {
-    ctx.drawImage(qrImg, qrX + 12, qrY + 12, qrBoxSize - 24, qrBoxSize - 24);
+    ctx.drawImage(qrImg, qrX + 10, qrY + 10, qrBoxSize - 20, qrBoxSize - 20);
   }
+
+  ctx.save();
+  ctx.translate(width - rightZoneW - 28, height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = design.textColor;
+  ctx.globalAlpha = 0.9;
+  ctx.font = '600 16px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(attendee.ticketCode, 0, 5);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // Perforation line
+  const perfX = qrX - 36;
+  if (design.showPerforation) {
+    ctx.save();
+    ctx.setLineDash([8, 8]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(perfX, 0);
+    ctx.lineTo(perfX, height);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Tier box & physical size note
+  if (design.showTierBadge) {
+    const tierW = 190;
+    const tierX = perfX - tierW - 36;
+    ctx.fillStyle = design.accentColor;
+    ctx.beginPath();
+    ctx.roundRect(tierX, 34, tierW, 48, 8);
+    ctx.fill();
+    ctx.fillStyle = '#0F172A';
+    ctx.font = '800 22px "Plus Jakarta Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(attendee.tier, tierX + tierW / 2, 65);
+    ctx.textAlign = 'left';
+  }
+
+  ctx.fillStyle = design.textColor;
+  ctx.globalAlpha = 0.78;
+  ctx.font = '500 16px "DM Sans", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(
+    `${getMaterialLabel(design.material)} · ${formatWristbandDimensionLabel(design)}`,
+    perfX - 36,
+    height - 26
+  );
+  ctx.textAlign = 'left';
+  ctx.globalAlpha = 1;
 
   return canvas;
 }
@@ -1710,7 +1791,9 @@ export async function downloadBatchWristbandsPng(
 ): Promise<void> {
   if (attendees.length === 0) return;
 
-  const bandHeight = getExportHeightForDesign(design);
+  const { width: rawBandWidth, height: rawBandHeight } = getExportDimensions(design);
+  const drawBandWidth = 1600;
+  const drawBandHeight = Math.round((rawBandHeight / rawBandWidth) * drawBandWidth);
   const marginX = 60;
   const marginY = 60;
   const headerH = options.includeHeader ? 120 : 0;
@@ -1718,7 +1801,7 @@ export async function downloadBatchWristbandsPng(
   const gapY = 34;
   const sheetWidth = 1720;
   const sheetHeight =
-    marginY * 2 + headerH + attendees.length * (bandHeight + labelH + gapY);
+    marginY * 2 + headerH + attendees.length * (drawBandHeight + labelH + gapY);
 
   const sheet = document.createElement('canvas');
   sheet.width = sheetWidth;
@@ -1739,7 +1822,7 @@ export async function downloadBatchWristbandsPng(
     ctx.fillStyle = '#64748B';
     ctx.font = '500 22px "DM Sans", sans-serif';
     ctx.fillText(
-      `Desain: ${design.name} (${design.themePreset} · ${design.widthMm}mm) · ${attendees.length} tiket · AES-256-GCM v${event.encryptionKeyVersion}`,
+      `Desain: ${design.name} (${design.themePreset} · ${formatWristbandDimensionLabel(design)}) · ${attendees.length} tiket · AES-256-GCM v${event.encryptionKeyVersion}`,
       marginX,
       y + 74
     );
@@ -1767,8 +1850,8 @@ export async function downloadBatchWristbandsPng(
     }
 
     const bandCanvas = await renderWristbandCanvas(design, event, att);
-    ctx.drawImage(bandCanvas, marginX, y);
-    y += bandHeight;
+    ctx.drawImage(bandCanvas, marginX, y, drawBandWidth, drawBandHeight);
+    y += drawBandHeight;
 
     if (options.includeCutIndex && i < attendees.length - 1) {
       ctx.save();

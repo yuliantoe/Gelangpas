@@ -3,6 +3,7 @@ import {
   Building2,
   CalendarDays,
   Check,
+  Crown,
   Lock,
   Radio,
   Shield,
@@ -11,6 +12,12 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+import {
+  PERMISSION_MATRIX,
+  getAccessTier,
+  getAccessTierLabel,
+  getRoleCapabilities,
+} from '../lib/permissions.ts';
 import type { AppStateSnapshot, PlatformUser, UserRole } from '../types/event.ts';
 
 interface UsersManagementViewProps {
@@ -43,13 +50,16 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     [snapshot.events, snapshot.event]
   );
 
+  const actorTier = getAccessTier(currentUser);
+  const caps = getRoleCapabilities(actorTier);
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [organizationName, setOrganizationName] = useState(
     () => snapshot.event.organizerName || currentUser.organizationName || ''
   );
-  const [role, setRole] = useState<UserRole>('user');
+  const [formRole, setFormRole] = useState<UserRole>('user');
   const [assignedGate, setAssignedGate] = useState(snapshot.event.gates[0] || 'Gerbang Utama A');
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([snapshot.event.id]);
   const [filterEventId, setFilterEventId] = useState<string>('all');
@@ -58,9 +68,6 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  const isAdmin = currentUser.role === 'administrator';
-  const canGrantAllEvents = Boolean(currentUser.isOwner || currentUser.assignedEventIds?.includes('*'));
 
   const onlineUserIds = useMemo(
     () => new Set((snapshot.onlineSessions || []).map((s) => s.userId)),
@@ -77,12 +84,30 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     );
   }, [snapshot.users, filterEventId]);
 
-  const adminCount = filteredUsers.filter((u) => u.role === 'administrator' && u.active).length;
-  const userCount = filteredUsers.filter((u) => u.role === 'user' && u.active).length;
+  const superAdminCount = filteredUsers.filter(
+    (u) => getAccessTier(u) === 'super-admin' && u.active
+  ).length;
+  const adminCount = filteredUsers.filter(
+    (u) => getAccessTier(u) === 'admin' && u.active
+  ).length;
+  const gateCount = filteredUsers.filter(
+    (u) => getAccessTier(u) === 'gate' && u.active
+  ).length;
   const activeEventSessions = snapshot.onlineSessions || [];
+
+  const canModifyTargetUser = (target: PlatformUser) => {
+    if (!caps.canManageGateStaff) return false;
+    if (target.isOwner) return false;
+    const targetTier = getAccessTier(target);
+    if (targetTier !== 'gate') {
+      return caps.canManageAdminsAndAccess;
+    }
+    return true;
+  };
 
   const toggleFormEvent = (evId: string) => {
     if (evId === '*') {
+      if (!caps.canManageAdminsAndAccess) return;
       setSelectedEventIds((prev) =>
         prev.includes('*') ? [snapshot.event.id] : ['*']
       );
@@ -99,10 +124,11 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   };
 
   const toggleExistingUserEvent = async (targetUser: PlatformUser, evId: string) => {
-    if (!isAdmin || targetUser.isOwner) return;
+    if (!canModifyTargetUser(targetUser)) return;
     setErrorMsg(null);
     let nextIds: string[];
     if (evId === '*') {
+      if (!caps.canManageAdminsAndAccess) return;
       nextIds = targetUser.assignedEventIds?.includes('*') ? [snapshot.event.id] : ['*'];
     } else {
       const base = (targetUser.assignedEventIds || []).filter((id) => id !== '*');
@@ -120,7 +146,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     try {
       await onUpdateUser(targetUser.id, { assignedEventIds: nextIds });
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Gagal memperbarui event pengguna.');
+      setErrorMsg(err instanceof Error ? err.message : 'Gagal memperbarui akses event pengguna.');
     }
   };
 
@@ -128,10 +154,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-    if (!isAdmin) {
-      setErrorMsg('Hanya Administrator penyelenggara yang dapat menambahkan pengguna baru.');
+    if (!caps.canManageGateStaff) {
+      setErrorMsg('Sistem Cek (Gate) tidak memiliki izin menambahkan akun tim.');
       return;
     }
+
+    const effectiveRole: UserRole =
+      caps.canManageAdminsAndAccess && formRole === 'administrator' ? 'administrator' : 'user';
     const effectiveEvents =
       selectedEventIds.length > 0 ? selectedEventIds : [snapshot.event.id];
 
@@ -140,7 +169,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       await onAddUser({
         fullName: fullName.trim(),
         email: email.trim(),
-        role,
+        role: effectiveRole,
         assignedGate,
         password: password.trim() || undefined,
         organizationName:
@@ -152,8 +181,15 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       setFullName('');
       setEmail('');
       setPassword('');
+      setFormRole('user');
       setSuccessMsg(
-        `Pengguna berhasil ditambahkan sebagai ${role === 'administrator' ? 'Administrator' : 'User'} untuk penyelenggara ${organizationName.trim() || snapshot.event.organizerName}.`
+        `Akun ${
+          effectiveRole === 'administrator'
+            ? effectiveEvents.includes('*')
+              ? 'Super Admin'
+              : 'Admin'
+            : 'Sistem Cek (Gate)'
+        } berhasil ditambahkan.`
       );
       window.setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
@@ -163,21 +199,23 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     }
   };
 
-  const handleRoleChange = async (userId: string, nextRole: UserRole) => {
-    setErrorMsg(null);
-    try {
-      await onUpdateUser(userId, { role: nextRole });
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Gagal mengubah peran.');
-    }
-  };
-
   const handleToggleActive = async (user: PlatformUser) => {
+    if (!canModifyTargetUser(user)) return;
     setErrorMsg(null);
     try {
       await onUpdateUser(user.id, { active: !user.active });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Gagal mengubah status aktif.');
+    }
+  };
+
+  const handleRoleChange = async (user: PlatformUser, nextRole: UserRole) => {
+    if (!caps.canManageAdminsAndAccess || user.isOwner) return;
+    setErrorMsg(null);
+    try {
+      await onUpdateUser(user.id, { role: nextRole });
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Gagal mengubah peran pengguna.');
     }
   };
 
@@ -190,16 +228,28 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     }
   };
 
+  const renderPermissionValue = (val: string) => {
+    const lower = val.toLowerCase();
+    if (lower === 'tidak') {
+      return <span className="font-medium text-slate-400">{val}</span>;
+    }
+    if (lower.startsWith('terbatas') || lower === 'operasional') {
+      return <span className="font-semibold text-amber-700">{val}</span>;
+    }
+    if (lower.startsWith('penuh')) {
+      return <span className="font-bold text-blue-700">{val}</span>;
+    }
+    return <span className="font-semibold text-emerald-700">{val}</span>;
+  };
+
   return (
     <div className="space-y-6">
-      {!isAdmin && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 flex items-center justify-between gap-4 text-xs text-amber-900">
-          <div className="flex items-center gap-2.5">
-            <Lock className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>
-              Anda masuk sebagai <strong>User ({currentUser.fullName})</strong>. Hanya Administrator penyelenggara yang dapat menambah atau mengubah anggota tim.
-            </span>
-          </div>
+      {!caps.canManageGateStaff && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 flex items-center gap-2.5 text-xs text-amber-900">
+          <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+          <span>
+            Anda masuk sebagai <strong>Sistem Cek (Gate)</strong>. Pengelolaan akun petugas dan Admin hanya tersedia untuk Admin atau Super Admin.
+          </span>
         </div>
       )}
 
@@ -227,20 +277,26 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
             {filteredUsers.length}
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            {adminCount} Admin · {userCount} User Gerbang/Loket
+            {superAdminCount} Super Admin · {adminCount} Admin · {gateCount} Gate
           </p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Administrator Aktif</span>
-            <Shield className="w-4 h-4 text-blue-600" />
+            <span>Tingkat Akses Anda</span>
+            {actorTier === 'super-admin' ? (
+              <Crown className="w-4 h-4 text-blue-600" />
+            ) : (
+              <Shield className="w-4 h-4 text-indigo-600" />
+            )}
           </div>
-          <p className="font-display text-2xl font-bold text-slate-900 tabular-nums mt-2">
-            {adminCount}
+          <p className="font-display text-lg font-bold text-slate-900 mt-2">
+            {getAccessTierLabel(actorTier)}
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            Kelola acara, harga, desain &amp; multi-user tim
+            {caps.canManageAdminsAndAccess
+              ? 'Kelola akun Admin, Petugas Cek & hak akses penuh'
+              : 'Kelola akun Petugas Cek (Gate) saja'}
           </p>
         </div>
 
@@ -260,6 +316,82 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
         </div>
       </div>
 
+      {/* Matriks Hak Akses Fitur */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-base font-semibold text-slate-900">
+              Matriks Hak Akses Sistem
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Pembagian wewenang antara Sistem Cek (Gate), Admin, dan Super Admin
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-blue-700">
+            Sesi Aktif: {getAccessTierLabel(actorTier)}
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/70 text-[12px] font-semibold text-slate-700">
+                <th className="py-3.5 px-6">Fitur / Hak Akses</th>
+                <th
+                  className={`py-3.5 px-4 ${
+                    actorTier === 'gate' ? 'bg-blue-50/70 text-blue-900' : ''
+                  }`}
+                >
+                  Sistem Cek (Gate)
+                </th>
+                <th
+                  className={`py-3.5 px-4 ${
+                    actorTier === 'admin' ? 'bg-blue-50/70 text-blue-900' : ''
+                  }`}
+                >
+                  Admin
+                </th>
+                <th
+                  className={`py-3.5 px-6 ${
+                    actorTier === 'super-admin' ? 'bg-blue-50/70 text-blue-900' : ''
+                  }`}
+                >
+                  Super Admin
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-[13px]">
+              {PERMISSION_MATRIX.map((row) => (
+                <tr key={row.feature} className="hover:bg-slate-50/60">
+                  <td className="py-3.5 px-6 font-semibold text-slate-900">{row.feature}</td>
+                  <td
+                    className={`py-3.5 px-4 ${
+                      actorTier === 'gate' ? 'bg-blue-50/40' : ''
+                    }`}
+                  >
+                    {renderPermissionValue(row.gate)}
+                  </td>
+                  <td
+                    className={`py-3.5 px-4 ${
+                      actorTier === 'admin' ? 'bg-blue-50/40' : ''
+                    }`}
+                  >
+                    {renderPermissionValue(row.admin)}
+                  </td>
+                  <td
+                    className={`py-3.5 px-6 ${
+                      actorTier === 'super-admin' ? 'bg-blue-50/40' : ''
+                    }`}
+                  >
+                    {renderPermissionValue(row.superAdmin)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {errorMsg && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-xs text-red-700">
           {errorMsg}
@@ -272,15 +404,19 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left: Add User Form Scoped to Organizer Event */}
+        {/* Left: Add User Form */}
         <div className="xl:col-span-4 bg-white border border-slate-200 rounded-xl p-6 space-y-4 h-fit">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900">
-                Tambah Tim Penyelenggara
+                {caps.canManageAdminsAndAccess
+                  ? 'Tambah Akun Tim & Admin'
+                  : 'Tambah Akun Petugas Cek (Gate)'}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Buat akun Admin atau Petugas khusus untuk event pilihan
+                {caps.canManageAdminsAndAccess
+                  ? 'Super Admin dapat menambahkan akun Petugas Cek maupun Admin event'
+                  : 'Admin hanya dapat menambahkan akun Petugas Cek untuk event yang dikelola'}
               </p>
             </div>
             <UserPlus className="w-4 h-4 text-slate-400 shrink-0" />
@@ -294,7 +430,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!caps.canManageGateStaff}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Contoh: Bagus Setiawan"
@@ -309,7 +445,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               <input
                 type="email"
                 required
-                disabled={!isAdmin}
+                disabled={!caps.canManageGateStaff}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nama@penyelenggara.id"
@@ -323,7 +459,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               </label>
               <input
                 type="text"
-                disabled={!isAdmin}
+                disabled={!caps.canManageGateStaff}
                 value={organizationName}
                 onChange={(e) => setOrganizationName(e.target.value)}
                 placeholder="Contoh: Soundscape Live Indonesia"
@@ -337,56 +473,58 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               </label>
               <input
                 type="text"
-                disabled={!isAdmin}
+                disabled={!caps.canManageGateStaff}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={role === 'administrator' ? 'Default: admin2026' : 'Default: user2026'}
+                placeholder={
+                  formRole === 'administrator' ? 'Default: admin2026' : 'Default: user2026'
+                }
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50"
               />
             </div>
 
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-                Peran Akses (Role)
+                Peran Hak Akses
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={!isAdmin}
-                  onClick={() => {
-                    setRole('administrator');
-                    setAssignedGate('Semua Gerbang');
-                  }}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
-                    role === 'administrator'
-                      ? 'border-blue-600 bg-blue-50/70'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <p className="text-xs font-bold text-slate-900">Administrator</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Kelola event &amp; tim
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  disabled={!isAdmin}
-                  onClick={() => {
-                    setRole('user');
-                    setAssignedGate(snapshot.event.gates[0] || 'Gerbang Utama A');
-                  }}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
-                    role === 'user'
-                      ? 'border-blue-600 bg-blue-50/70'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <p className="text-xs font-bold text-slate-900">User</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Check-in &amp; loket
-                  </p>
-                </button>
-              </div>
+              {caps.canManageAdminsAndAccess ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormRole('user')}
+                    className={`p-2.5 rounded-lg border text-left transition-colors ${
+                      formRole === 'user'
+                        ? 'border-blue-600 bg-blue-50 text-blue-950'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <p className="text-xs font-bold">Sistem Cek (Gate)</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Scan sesuai gate</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormRole('administrator')}
+                    className={`p-2.5 rounded-lg border text-left transition-colors ${
+                      formRole === 'administrator'
+                        ? 'border-blue-600 bg-blue-50 text-blue-950'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <p className="text-xs font-bold">Admin</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Kelola event &amp; peserta</p>
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 flex items-start gap-2.5">
+                  <UserCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Sistem Cek (Gate)</p>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                      Admin hanya berwenang menambah akun Petugas Cek. Penambahan akun Admin hanya oleh Super Admin.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -394,16 +532,16 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 Event / Acara yang Diikuti *
               </label>
               <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-1.5 max-h-40 overflow-y-auto">
-                {canGrantAllEvents && (
+                {caps.canManageAdminsAndAccess && (
                   <label className="flex items-center gap-2 text-xs font-semibold text-blue-700 cursor-pointer py-0.5">
                     <input
                       type="checkbox"
-                      disabled={!isAdmin}
+                      disabled={!caps.canManageGateStaff}
                       checked={selectedEventIds.includes('*')}
                       onChange={() => toggleFormEvent('*')}
                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-600"
                     />
-                    <span>Semua Event (Super Admin Platform)</span>
+                    <span>Semua Event (Akses Super Admin)</span>
                   </label>
                 )}
                 {eventsList.map((ev) => {
@@ -416,7 +554,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     >
                       <input
                         type="checkbox"
-                        disabled={!isAdmin || selectedEventIds.includes('*')}
+                        disabled={!caps.canManageGateStaff || selectedEventIds.includes('*')}
                         checked={checked}
                         onChange={() => toggleFormEvent(ev.id)}
                         className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-600"
@@ -437,10 +575,10 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Penempatan Gerbang
+                Penempatan Gerbang / Zona
               </label>
               <select
-                disabled={!isAdmin}
+                disabled={!caps.canManageGateStaff}
                 value={assignedGate}
                 onChange={(e) => setAssignedGate(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white disabled:bg-slate-50"
@@ -456,14 +594,16 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
             <button
               type="submit"
-              disabled={!isAdmin || submitting}
+              disabled={!caps.canManageGateStaff || submitting}
               className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               <UserPlus className="w-4 h-4" />
               <span>
                 {submitting
                   ? 'Menambahkan...'
-                  : `Tambah sebagai ${role === 'administrator' ? 'Administrator' : 'User'}`}
+                  : formRole === 'administrator' && caps.canManageAdminsAndAccess
+                  ? 'Tambah Akun Admin'
+                  : 'Tambah Petugas Cek (Gate)'}
               </span>
             </button>
           </form>
@@ -474,10 +614,12 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
           <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-display text-base font-semibold text-slate-900">
-                Daftar Multi-User Penyelenggara ({filteredUsers.length})
+                Daftar Akun &amp; Hak Akses Tim ({filteredUsers.length})
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Atur penugasan event, peran, dan gerbang tugas tiap anggota tim penyelenggara
+                {caps.canManageAdminsAndAccess
+                  ? 'Super Admin dapat mengatur akun Admin, Petugas Cek, event, dan gerbang tugas'
+                  : 'Admin dapat mengatur akun Petugas Cek (Gate); akun Admin terkunci untuk Super Admin'}
               </p>
             </div>
 
@@ -507,7 +649,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500">
                   <th className="py-3 px-5">Pengguna &amp; Penyelenggara</th>
                   <th className="py-3 px-3">Event yang Dikelola</th>
-                  <th className="py-3 px-3">Peran</th>
+                  <th className="py-3 px-3">Hak Akses</th>
                   <th className="py-3 px-3">Gerbang</th>
                   <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-5 text-right">Aksi</th>
@@ -517,11 +659,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 {filteredUsers.map((u) => {
                   const isCurrent = u.id === currentUser.id;
                   const isUserOnline = onlineUserIds.has(u.id);
-                  const isAllScope = Boolean(u.isOwner || u.assignedEventIds?.includes('*'));
-                  const assignedTitles = isAllScope
-                    ? ['Semua Event']
-                    : (u.assignedEventIds || [])
-                        .map((evId) => eventsList.find((e) => e.id === evId)?.title || evId);
+                  const uTier = getAccessTier(u);
+                  const canEditThisRow = canModifyTargetUser(u);
+                  const assignedTitles =
+                    uTier === 'super-admin'
+                      ? ['Semua Event']
+                      : (u.assignedEventIds || [])
+                          .map((evId) => eventsList.find((e) => e.id === evId)?.title || evId);
                   const isEditingEvents = editingEventsUserId === u.id;
 
                   return (
@@ -549,7 +693,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                             <p className="text-[11px] font-medium text-slate-800 truncate">
                               {assignedTitles.join(', ')}
                             </p>
-                            {isAdmin && !u.isOwner && (
+                            {canEditThisRow && (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -557,32 +701,51 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                                 }
                                 className="text-[11px] font-semibold text-blue-600 hover:underline"
                               >
-                                {isEditingEvents ? 'Tutup Akses Event' : 'Ubah Event'}
+                                {isEditingEvents ? 'Tutup Akses Event' : 'Ubah Akses Event'}
                               </button>
                             )}
                           </div>
                         </td>
 
-                        <td className="py-3 px-3">
-                          <select
-                            disabled={!isAdmin || Boolean(u.isOwner)}
-                            value={u.role}
-                            onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-900 disabled:bg-slate-50 disabled:text-slate-600"
-                          >
-                            <option value="administrator">Administrator</option>
-                            <option value="user">User</option>
-                          </select>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          {caps.canManageAdminsAndAccess && !u.isOwner ? (
+                            <select
+                              aria-label={`Ubah peran ${u.fullName}`}
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
+                              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-800"
+                            >
+                              <option value="user">Sistem Cek (Gate)</option>
+                              <option value="administrator">
+                                {u.assignedEventIds?.includes('*') ? 'Super Admin' : 'Admin'}
+                              </option>
+                            </select>
+                          ) : uTier === 'super-admin' ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">
+                              <Crown className="w-3 h-3" />
+                              <span>Super Admin</span>
+                            </span>
+                          ) : uTier === 'admin' ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700">
+                              <Shield className="w-3 h-3" />
+                              <span>Admin</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                              <UserCheck className="w-3 h-3 text-emerald-600" />
+                              <span>Sistem Cek (Gate)</span>
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3 px-3">
                           <select
-                            disabled={!isAdmin}
+                            disabled={!canEditThisRow}
                             value={u.assignedGate}
                             onChange={(e) =>
                               onUpdateUser(u.id, { assignedGate: e.target.value })
                             }
-                            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 disabled:bg-slate-50"
+                            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 disabled:bg-slate-50 disabled:text-slate-400"
                           >
                             <option value="Semua Gerbang">Semua Gerbang</option>
                             {snapshot.event.gates.map((g) => (
@@ -596,9 +759,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                         <td className="py-3 px-3 whitespace-nowrap">
                           <button
                             type="button"
-                            disabled={!isAdmin || Boolean(u.isOwner)}
+                            disabled={!canEditThisRow}
                             onClick={() => handleToggleActive(u)}
-                            className={`text-xs font-semibold ${
+                            className={`text-xs font-semibold disabled:opacity-60 ${
                               u.active ? 'text-emerald-700' : 'text-slate-400'
                             }`}
                           >
@@ -618,11 +781,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                             </button>
                             <button
                               type="button"
-                              disabled={!isAdmin || isCurrent || Boolean(u.isOwner)}
+                              disabled={!canEditThisRow || isCurrent}
                               onClick={() => handleDelete(u.id)}
                               title={
                                 u.isOwner
-                                  ? 'Pemilik Utama Platform tidak dapat dihapus'
+                                  ? 'Super Admin Utama tidak dapat dihapus'
+                                  : !canEditThisRow
+                                  ? 'Hanya Super Admin yang dapat menghapus akun Admin'
                                   : 'Hapus pengguna'
                               }
                               className="p-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 disabled:opacity-40 transition-colors"
@@ -640,7 +805,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                               <span className="font-semibold text-slate-700">
                                 Pilih Event untuk {u.fullName}:
                               </span>
-                              {canGrantAllEvents && (
+                              {caps.canManageAdminsAndAccess && (
                                 <label className="inline-flex items-center gap-1.5 font-semibold text-blue-700 cursor-pointer">
                                   <input
                                     type="checkbox"
@@ -648,7 +813,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                                     onChange={() => void toggleExistingUserEvent(u, '*')}
                                     className="rounded border-slate-300 text-blue-600"
                                   />
-                                  <span>Semua Event</span>
+                                  <span>Semua Event (Super Admin)</span>
                                 </label>
                               )}
                               {eventsList.map((ev) => {

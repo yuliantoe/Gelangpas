@@ -78,14 +78,15 @@
       "textColor": "#FFFFFF",
       "material": "woven",
       "pattern": "diagonal",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "GelangPass Verified",
       "customTagline": "Akses Resmi Gerbang Elektronik",
-      "updatedAt": "2026-11-19T02:09:05.576Z"
+      "updatedAt": "2026-11-19T02:09:05.576Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-gala-gold",
@@ -98,14 +99,15 @@
       "textColor": "#FAFAFA",
       "material": "silicone",
       "pattern": "geometric",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": false,
       "showSecurityMicrotext": true,
       "sponsorLabel": "VIP Priority Access",
       "customTagline": "Undangan Resmi Terbatas",
-      "updatedAt": "2026-11-15T08:46:24.943Z"
+      "updatedAt": "2026-11-15T08:46:24.943Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-tech-emerald",
@@ -118,14 +120,15 @@
       "textColor": "#ECFDF5",
       "material": "tyvek",
       "pattern": "grid",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Summit Indonesia 2026",
       "customTagline": "Zona Hall Utama & Workshop",
-      "updatedAt": "2026-11-15T08:46:24.943Z"
+      "updatedAt": "2026-11-15T08:46:24.943Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-sport-crimson",
@@ -138,14 +141,15 @@
       "textColor": "#FFFFFF",
       "material": "rfid-pvc",
       "pattern": "wave",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Official Race Pass",
       "customTagline": "Start Zone & Hydration Bay",
-      "updatedAt": "2026-11-15T08:46:24.943Z"
+      "updatedAt": "2026-11-15T08:46:24.943Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-musik-indie",
@@ -158,14 +162,15 @@
       "textColor": "#FFFFFF",
       "material": "woven",
       "pattern": "wave",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Sound Stage Official",
       "customTagline": "Festival Area & Front Row",
-      "updatedAt": "2026-11-15T08:56:30.139Z"
+      "updatedAt": "2026-11-15T08:56:30.139Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-festival-nusantara",
@@ -178,14 +183,15 @@
       "textColor": "#FFFBEB",
       "material": "woven",
       "pattern": "geometric",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Pesona Festival 2026",
       "customTagline": "Panggung Utama & Zona Kuliner",
-      "updatedAt": "2026-11-15T08:56:30.139Z"
+      "updatedAt": "2026-11-15T08:56:30.139Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-sekolah-pensi",
@@ -198,14 +204,15 @@
       "textColor": "#FFFFFF",
       "material": "tyvek",
       "pattern": "geometric",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "OSIS & Panitia Sekolah",
       "customTagline": "Akses Siswa, Guru & Wali Murid",
-      "updatedAt": "2026-11-15T08:56:30.139Z"
+      "updatedAt": "2026-11-15T08:56:30.139Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-sekolah-classmeet",
@@ -218,14 +225,15 @@
       "textColor": "#ECFDF5",
       "material": "silicone",
       "pattern": "diagonal",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": false,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Kompetisi Antar Kelas",
       "customTagline": "Zona Lapangan & Aula Kampus",
-      "updatedAt": "2026-11-15T08:56:30.139Z"
+      "updatedAt": "2026-11-15T08:56:30.139Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-bisnis-forum",
@@ -238,14 +246,15 @@
       "textColor": "#F8FAFC",
       "material": "rfid-pvc",
       "pattern": "grid",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Executive Business Forum",
       "customTagline": "Main Ballroom & Executive Lounge",
-      "updatedAt": "2026-11-15T08:56:30.139Z"
+      "updatedAt": "2026-11-15T08:56:30.139Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-bisnis-expo",
@@ -258,14 +267,15 @@
       "textColor": "#FFFFFF",
       "material": "tyvek",
       "pattern": "solid",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Indonesia Business Summit",
       "customTagline": "Ruang Konferensi & Booth Mitra",
-      "updatedAt": "2026-11-15T08:56:30.139Z"
+      "updatedAt": "2026-11-15T08:56:30.139Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-sport-running-marathon",
@@ -278,14 +288,15 @@
       "textColor": "#FFFFFF",
       "material": "rfid-pvc",
       "pattern": "diagonal",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Official Race Runner Pass",
       "customTagline": "Start Corral · Hydration & Finisher Zone",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-sport-running-trail",
@@ -298,14 +309,15 @@
       "textColor": "#FFFFFF",
       "material": "tyvek",
       "pattern": "wave",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Indonesia Running Series",
       "customTagline": "Timing Chip · 5K / 10K / Half Marathon",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-konser-musik-arena",
@@ -318,14 +330,15 @@
       "textColor": "#FFFFFF",
       "material": "woven",
       "pattern": "wave",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Live Concert Tour 2026",
       "customTagline": "Festival Pit · Soundcheck & Encore",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-bisnis-summit",
@@ -338,14 +351,15 @@
       "textColor": "#F8FAFC",
       "material": "rfid-pvc",
       "pattern": "grid",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Executive Summit Pass",
       "customTagline": "Keynote Hall · VIP Networking Lounge",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-reuni-akbar",
@@ -358,14 +372,15 @@
       "textColor": "#FFFBEB",
       "material": "woven",
       "pattern": "geometric",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Ikatan Alumni Angkatan",
       "customTagline": "Hall Utama · Gala Dinner & Nostalgia",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-reuni-silver",
@@ -378,14 +393,15 @@
       "textColor": "#F8FAFC",
       "material": "silicone",
       "pattern": "solid",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": false,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Silver Reunion Celebration",
       "customTagline": "Registrasi Alumni & Doorprize",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-universitas-ospek",
@@ -398,14 +414,15 @@
       "textColor": "#FFFFFF",
       "material": "tyvek",
       "pattern": "diagonal",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "BEM & Panitia Kampus",
       "customTagline": "Auditorium Kampus & Zona Fakultas",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-universitas-dies",
@@ -418,14 +435,15 @@
       "textColor": "#FFF1F2",
       "material": "woven",
       "pattern": "geometric",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Senat & Alumni Universitas",
       "customTagline": "Graha Sabha · Tamu & Wisudawan",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-gkl-1",
@@ -438,14 +456,15 @@
       "textColor": "#FFFFFF",
       "material": "woven",
       "pattern": "wave",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "JazzLoveFest 2024",
       "customTagline": "VIP | GATE 1 · Smooth Jazz Stage",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-gkl-2",
@@ -458,14 +477,15 @@
       "textColor": "#FFFFFF",
       "material": "tyvek",
       "pattern": "geometric",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "LIVELINK 2024 · www.livelink.com",
       "customTagline": "CAT 3B · Live Music & Arena Access",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-gkl-3",
@@ -478,14 +498,15 @@
       "textColor": "#FFF1F2",
       "material": "woven",
       "pattern": "wave",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Rekaman di Taman · Music Festival",
       "customTagline": "VIP Access · 24/09/2024 · Garden Stage",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-gkl-4",
@@ -498,14 +519,15 @@
       "textColor": "#FFFFFF",
       "material": "woven",
       "pattern": "diagonal",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "NIGHT MUSICLUB · DAY 3",
       "customTagline": "Jakarta International Stadium · VIP Brass & Piano",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-gkl-5",
@@ -518,14 +540,15 @@
       "textColor": "#FFFFFF",
       "material": "tyvek",
       "pattern": "geometric",
-      "widthMm": 25,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "International Jazz Day",
       "customTagline": "CAT 2AB · Istora Senayan Hall",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     },
     {
       "id": "dsn-gkl-6",
@@ -538,14 +561,15 @@
       "textColor": "#FFFFFF",
       "material": "tyvek",
       "pattern": "diagonal",
-      "widthMm": 19,
+      "widthMm": 22,
       "showHolderName": true,
       "showTierBadge": true,
       "showPerforation": true,
       "showSecurityMicrotext": true,
       "sponsorLabel": "Creatiffest 2024",
       "customTagline": "Valid for Day 3 Access · Creative Festival",
-      "updatedAt": "2026-11-19T02:00:56.642Z"
+      "updatedAt": "2026-11-19T02:00:56.642Z",
+      "lengthCm": 28
     }
   ],
   "attendees": [
@@ -1380,6 +1404,36 @@
   ],
   "notifications": [
     {
+      "eventId": "ev-soundscape-2026",
+      "type": "security-alert",
+      "title": "Akun Tim Baru Ditambahkan",
+      "message": "Admin Uji (Soundscape Live Indonesia) ditambahkan sebagai Admin.",
+      "severity": "info",
+      "id": "notif-66573593",
+      "timestamp": "2026-11-20T04:41:33.964Z",
+      "read": false
+    },
+    {
+      "eventId": "ev-soundscape-2026",
+      "type": "security-alert",
+      "title": "Akun Tim Baru Ditambahkan",
+      "message": "Petugas Uji (Soundscape Live Indonesia) ditambahkan sebagai Sistem Cek (Gate).",
+      "severity": "info",
+      "id": "notif-42ecc5ff",
+      "timestamp": "2026-11-20T04:41:33.954Z",
+      "read": false
+    },
+    {
+      "eventId": "ev-soundscape-2026",
+      "type": "security-alert",
+      "title": "Pengguna Baru Ditambahkan",
+      "message": "Test Petugas (Soundscape Live Indonesia) ditambahkan sebagai User.",
+      "severity": "info",
+      "id": "notif-278289af",
+      "timestamp": "2026-11-20T04:22:49.886Z",
+      "read": false
+    },
+    {
       "eventId": "ev-event-uji-multiuser-3ec8",
       "type": "security-alert",
       "title": "Pengguna Baru Ditambahkan",
@@ -1481,6 +1535,21 @@
       ]
     },
     {
+      "id": "usr-admin-all",
+      "fullName": "Administrator Akses Semua",
+      "email": "admin.semua@gelangpass.id",
+      "role": "administrator",
+      "organizationName": "GelangPass Pusat (Akses Semua)",
+      "assignedEventIds": [
+        "*"
+      ],
+      "isOwner": true,
+      "assignedGate": "Semua Gerbang",
+      "active": true,
+      "createdAt": "2026-11-20T04:22:46.210Z",
+      "lastActiveAt": "2026-11-20T04:28:22.379Z"
+    },
+    {
       "id": "usr-admin-2",
       "fullName": "Nadira Kusuma (Koordinator)",
       "email": "nadira.admin@gelangpass.id",
@@ -1488,7 +1557,7 @@
       "assignedGate": "Gerbang VIP Barat",
       "active": true,
       "createdAt": "2026-11-15T09:15:13.269Z",
-      "lastActiveAt": "2026-11-15T09:15:13.269Z",
+      "lastActiveAt": "2026-11-20T04:28:22.396Z",
       "organizationName": "Soundscape Live Indonesia",
       "assignedEventIds": [
         "ev-soundscape-2026"
@@ -1502,7 +1571,7 @@
       "assignedGate": "Gerbang Utama A",
       "active": true,
       "createdAt": "2026-11-15T09:15:13.269Z",
-      "lastActiveAt": "2026-11-15T09:29:57.797Z",
+      "lastActiveAt": "2026-11-20T04:28:22.403Z",
       "organizationName": "Soundscape Live Indonesia",
       "assignedEventIds": [
         "ev-soundscape-2026"
@@ -1596,6 +1665,7 @@
     "usr-admin-1": "01c4ef73ce972a6ecb289d26472a1858d888bf326a87d4bf46591b1464d7c771",
     "usr-admin-2": "01c4ef73ce972a6ecb289d26472a1858d888bf326a87d4bf46591b1464d7c771",
     "usr-staff-1": "5188c5ec34fd83df6270f022c52f9bb5a9122f70c807d541012afefed34d3353",
-    "usr-staff-2": "5188c5ec34fd83df6270f022c52f9bb5a9122f70c807d541012afefed34d3353"
+    "usr-staff-2": "5188c5ec34fd83df6270f022c52f9bb5a9122f70c807d541012afefed34d3353",
+    "usr-admin-all": "01c4ef73ce972a6ecb289d26472a1858d888bf326a87d4bf46591b1464d7c771"
   }
 }

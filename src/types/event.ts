@@ -2,6 +2,8 @@ export type TicketTier = string;
 
 export type UserRole = 'administrator' | 'user';
 
+export type LoginRoleMenu = 'administrator' | 'admin' | 'user';
+
 export interface PlatformUser {
   id: string;
   fullName: string;
@@ -50,7 +52,8 @@ export interface WristbandDesign {
   textColor: string;
   material: WristbandMaterial;
   pattern: WristbandPattern;
-  widthMm: 19 | 25;
+  widthMm: 22 | 19 | 25;
+  lengthCm?: number;
   showHolderName: boolean;
   showTierBadge: boolean;
   showPerforation: boolean;

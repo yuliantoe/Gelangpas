@@ -12,11 +12,13 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
+import { getRoleCapabilities, type AccessTier } from '../lib/permissions.ts';
 import type { AppStateSnapshot, EventInfo, UserRole } from '../types/event.ts';
 
 interface EventManagementViewProps {
   snapshot: AppStateSnapshot;
   currentRole: UserRole;
+  accessTier?: AccessTier;
   currentOrganizationName?: string;
   onCreateEvent: (input: {
     title: string;
@@ -40,6 +42,7 @@ interface EventManagementViewProps {
 export const EventManagementView: React.FC<EventManagementViewProps> = ({
   snapshot,
   currentRole,
+  accessTier,
   currentOrganizationName,
   onCreateEvent,
   onUpdateEvent,
@@ -48,7 +51,11 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
   onNavigateTab,
   onOpenLandingPage,
 }) => {
-  const isAdmin = currentRole === 'administrator';
+  const effectiveTier: AccessTier =
+    accessTier || (currentRole === 'administrator' ? 'admin' : 'gate');
+  const caps = getRoleCapabilities(effectiveTier);
+  const canEditOperational = caps.canManageSystemLimited;
+  const canCreateOrDelete = caps.canManageSystemFull;
   const eventsList = snapshot.events && snapshot.events.length > 0 ? snapshot.events : [snapshot.event];
 
   // Add Event Form State
@@ -95,8 +102,8 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    if (!isAdmin) {
-      setErrorMsg('Hanya Administrator yang dapat menambahkan acara atau event baru.');
+    if (!canCreateOrDelete) {
+      setErrorMsg('Pengaturan Sistem Penuh — Hanya Super Admin yang dapat menambahkan acara baru.');
       return;
     }
 
@@ -164,7 +171,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
   };
 
   const handleSaveEdit = async (evId: string) => {
-    if (!editDraft || !isAdmin) return;
+    if (!editDraft || !canEditOperational) return;
     setErrorMsg(null);
     if (!editDraft.title.trim() || !editDraft.venue.trim() || !editDraft.dateLabel.trim()) {
       setErrorMsg('Nama acara, lokasi, dan tanggal tidak boleh kosong.');
@@ -198,7 +205,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
   };
 
   const handleDelete = async (evId: string) => {
-    if (!isAdmin) return;
+    if (!canCreateOrDelete) return;
     setErrorMsg(null);
     setBusyId(evId);
     try {
@@ -214,12 +221,19 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {!isAdmin && (
+      {!canCreateOrDelete && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 flex items-center gap-3 text-xs text-amber-900">
           <Lock className="w-4 h-4 text-amber-700 shrink-0" />
           <span>
-            Anda masuk dengan peran <strong>User</strong>. Hanya akun <strong>Administrator</strong> yang
-            dapat menambah, mengedit, atau menghapus acara. Anda tetap dapat berpindah acara aktif jika diperlukan.
+            {canEditOperational ? (
+              <>
+                Akun <strong>Admin (Pengaturan Terbatas)</strong> dapat mengubah detail operasional acara yang ditugaskan. Pembuatan dan penghapusan event hanya tersedia untuk <strong>Super Admin</strong>.
+              </>
+            ) : (
+              <>
+                Anda masuk dengan peran <strong>Sistem Cek (Gate)</strong>. Pengaturan acara tidak tersedia.
+              </>
+            )}
           </span>
         </div>
       )}
@@ -377,7 +391,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
                             <span>Aktifkan</span>
                           </button>
                         )}
-                        {isAdmin && (
+                        {canEditOperational && (
                           <button
                             type="button"
                             onClick={() => (isEditing ? setEditingId(null) : startEdit(ev))}
@@ -387,7 +401,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
                             <span>{isEditing ? 'Tutup' : 'Edit'}</span>
                           </button>
                         )}
-                        {isAdmin && eventsList.length > 1 && (
+                        {canCreateOrDelete && eventsList.length > 1 && (
                           confirmDeleteId === ev.id ? (
                             <div className="inline-flex items-center gap-1.5">
                               <button
@@ -587,7 +601,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Contoh: Expo Inovasi Kampus 2026"
@@ -602,7 +616,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 value={organizerName}
                 onChange={(e) => setOrganizerName(e.target.value)}
                 placeholder="Contoh: PT Kreasi Panggung Nusantara"
@@ -616,7 +630,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
               </label>
               <input
                 type="text"
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 value={subtitle}
                 onChange={(e) => setSubtitle(e.target.value)}
                 placeholder="Contoh: Pameran Teknologi & Pentas Musik"
@@ -631,7 +645,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
               <input
                 type="text"
                 required
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 value={venue}
                 onChange={(e) => setVenue(e.target.value)}
                 placeholder="Contoh: Balai Kartini, Jakarta"
@@ -647,7 +661,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
                 <input
                   type="text"
                   required
-                  disabled={!isAdmin}
+                  disabled={!canCreateOrDelete}
                   value={dateLabel}
                   onChange={(e) => setDateLabel(e.target.value)}
                   placeholder="20 Des 2026"
@@ -661,7 +675,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
                 <input
                   type="number"
                   min={10}
-                  disabled={!isAdmin}
+                  disabled={!canCreateOrDelete}
                   value={capacity}
                   onChange={(e) => setCapacity(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono text-slate-900 disabled:bg-slate-50"
@@ -675,7 +689,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
               </label>
               <input
                 type="text"
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 value={gatesText}
                 onChange={(e) => setGatesText(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50"
@@ -687,7 +701,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
                 Koleksi Desain Gelang Default
               </label>
               <select
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 value={designId}
                 onChange={(e) => setDesignId(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:bg-slate-50"
@@ -705,7 +719,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
                 Template Kategori Tiket Awal
               </label>
               <select
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 value={categoryPreset}
                 onChange={(e) =>
                   setCategoryPreset(
@@ -724,7 +738,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
             <label className="flex items-center gap-2 text-xs text-slate-700 pt-1">
               <input
                 type="checkbox"
-                disabled={!isAdmin}
+                disabled={!canCreateOrDelete}
                 checked={activateImmediately}
                 onChange={(e) => setActivateImmediately(e.target.checked)}
                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-600"
@@ -734,7 +748,7 @@ export const EventManagementView: React.FC<EventManagementViewProps> = ({
 
             <button
               type="submit"
-              disabled={!isAdmin || submitting}
+              disabled={!canCreateOrDelete || submitting}
               className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               <Plus className="w-4 h-4" />

@@ -5,10 +5,12 @@ import {
   Download,
   Plus,
   QrCode,
+  RefreshCw,
   Search,
   ShieldCheck,
   X,
 } from 'lucide-react';
+import { getRoleCapabilities, type AccessTier } from '../lib/permissions.ts';
 import type {
   AppStateSnapshot,
   Attendee,
@@ -23,8 +25,15 @@ import {
 
 interface VisitorsViewProps {
   snapshot: AppStateSnapshot;
+  accessTier?: AccessTier;
+  assignedGate?: string;
   onCheckIn: (input: { qrToken?: string; gate: string }) => Promise<unknown>;
   onToggleRevoked: (id: string, revoked: boolean) => Promise<unknown>;
+  onReissueWristband?: (id: string) => Promise<{
+    attendee?: Attendee;
+    oldCode?: string;
+    newCode?: string;
+  }>;
   onBatchCreate: (input: {
     prefixName: string;
     tier: TicketTier;
@@ -35,10 +44,19 @@ interface VisitorsViewProps {
 
 export const VisitorsView: React.FC<VisitorsViewProps> = ({
   snapshot,
+  accessTier = 'super-admin',
+  assignedGate,
   onCheckIn,
   onToggleRevoked,
+  onReissueWristband,
   onBatchCreate,
 }) => {
+  const caps = getRoleCapabilities(accessTier);
+  const canManage = caps.canManageAttendeesAndCategories;
+  const canBlockOrReissue = caps.canBlockOrReissueWristband;
+  const canSeeFinancial = caps.canViewFinancialReports;
+  const isGateScoped =
+    accessTier === 'gate' && Boolean(assignedGate) && assignedGate !== 'Semua Gerbang';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'checked-in' | 'pending' | 'revoked'>('all');
   const [tierFilter, setTierFilter] = useState<'all' | TicketTier>('all');
@@ -63,12 +81,16 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
   const [batchCount, setBatchCount] = useState(5);
   const [batchGate, setBatchGate] = useState(snapshot.event.gates[1] || snapshot.event.gates[0]);
   const [creatingBatch, setCreatingBatch] = useState(false);
+  const [reissuingId, setReissuingId] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const activeDesign =
     snapshot.designs.find((d) => d.id === snapshot.event.activeDesignId) || snapshot.designs[0];
 
   const filtered = useMemo(() => {
     return snapshot.attendees.filter((a) => {
+      if (isGateScoped && assignedGate && a.gateAssigned !== assignedGate) return false;
       if (statusFilter === 'checked-in' && !a.checkedIn) return false;
       if (statusFilter === 'pending' && (a.checkedIn || a.revoked)) return false;
       if (statusFilter === 'revoked' && !a.revoked) return false;
@@ -83,7 +105,26 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
       }
       return true;
     });
-  }, [snapshot.attendees, statusFilter, tierFilter, search]);
+  }, [snapshot.attendees, isGateScoped, assignedGate, statusFilter, tierFilter, search]);
+
+  const handleReissue = async (att: Attendee) => {
+    if (!onReissueWristband || !canBlockOrReissue) return;
+    setActionNotice(null);
+    setActionError(null);
+    setReissuingId(att.id);
+    try {
+      const res = await onReissueWristband(att.id);
+      const oldCode = res?.oldCode || att.ticketCode;
+      const newCode = res?.newCode || res?.attendee?.ticketCode || 'kode baru';
+      setActionNotice(
+        `Gelang hilang atas nama ${att.fullName} diterbitkan ulang: ${oldCode} diganti menjadi ${newCode} (QR lama dinonaktifkan).`
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Gagal menerbitkan ulang gelang.');
+    } finally {
+      setReissuingId(null);
+    }
+  };
 
   const handleBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,15 +194,47 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
           </select>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowBatchModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Generate Gelang Batch</span>
-        </button>
+        {canManage ? (
+          <button
+            type="button"
+            onClick={() => setShowBatchModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Generate Gelang Batch</span>
+          </button>
+        ) : (
+          <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+            {isGateScoped ? `Filter otomatis gate tugas: ${assignedGate}` : 'Mode baca & validasi gate'}
+          </span>
+        )}
       </div>
+
+      {actionNotice && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium text-emerald-800 flex items-center justify-between gap-3">
+          <span>{actionNotice}</span>
+          <button
+            type="button"
+            onClick={() => setActionNotice(null)}
+            className="text-emerald-700 hover:text-emerald-900"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 flex items-center justify-between gap-3">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="text-red-700 hover:text-red-900"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Directory Data Grid */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -171,7 +244,9 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
               <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold text-slate-500">
                 <th className="py-3 px-5">Pengunjung</th>
                 <th className="py-3 px-4">Kode Gelang · Kategori</th>
-                <th className="py-3 px-4">Gerbang · Pembayaran</th>
+                <th className="py-3 px-4">
+                  {canSeeFinancial ? 'Gerbang · Pembayaran' : 'Gerbang · Status Bayar'}
+                </th>
                 <th className="py-3 px-4">Status Kehadiran</th>
                 <th className="py-3 px-5 text-right">Aksi</th>
               </tr>
@@ -192,7 +267,9 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
                   <td className="py-3 px-4 whitespace-nowrap">
                     <p className="text-slate-800">{att.gateAssigned}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      {att.paymentMethod} · Rp {att.amountPaid.toLocaleString('id-ID')}
+                      {canSeeFinancial
+                        ? `${att.paymentMethod} · Rp ${att.amountPaid.toLocaleString('id-ID')}`
+                        : `${att.paymentMethod} · Terkonfirmasi`}
                     </p>
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
@@ -236,22 +313,36 @@ export const VisitorsView: React.FC<VisitorsViewProps> = ({
                           <span>Check-In</span>
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => onToggleRevoked(att.id, !att.revoked)}
-                        title={att.revoked ? 'Pulihkan Akses' : 'Blokir Gelang'}
-                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                          att.revoked
-                            ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
-                            : 'border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200'
-                        }`}
-                      >
-                        {att.revoked ? (
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                        ) : (
-                          <Ban className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+                      {canBlockOrReissue && onReissueWristband && (
+                        <button
+                          type="button"
+                          disabled={reissuingId === att.id}
+                          onClick={() => handleReissue(att)}
+                          title="Terbitkan ulang gelang hilang (buat kode & QR baru)"
+                          className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${reissuingId === att.id ? 'animate-spin' : ''}`} />
+                          <span>Reissue</span>
+                        </button>
+                      )}
+                      {canBlockOrReissue && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleRevoked(att.id, !att.revoked)}
+                          title={att.revoked ? 'Pulihkan Akses' : 'Blokir Gelang'}
+                          className={`inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                            att.revoked
+                              ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                              : 'border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200'
+                          }`}
+                        >
+                          {att.revoked ? (
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          ) : (
+                            <Ban className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

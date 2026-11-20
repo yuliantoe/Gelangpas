@@ -20,6 +20,7 @@ import type {
   Attendee,
   CheckInLog,
   EventInfo,
+  LoginRoleMenu,
   NotificationRules,
   OrganizerNotification,
   PaymentMethod,
@@ -588,6 +589,24 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         };
       }
 
+      const activeActor = snapshot.users.find((u) => u.id === activeUserId);
+      if (
+        activeActor &&
+        activeActor.role === 'user' &&
+        activeActor.assignedGate &&
+        activeActor.assignedGate !== 'Semua Gerbang' &&
+        (input.gate !== activeActor.assignedGate ||
+          (target.gateAssigned !== 'Semua Gerbang' &&
+            target.gateAssigned !== activeActor.assignedGate))
+      ) {
+        return {
+          ok: false,
+          status: 'invalid-signature',
+          message: `Akun Sistem Cek (${activeActor.fullName}) hanya berwenang memvalidasi gate ${activeActor.assignedGate}.`,
+          attendee: target,
+        };
+      }
+
       const nowIso = new Date().toISOString();
       const pendingItem: PendingOfflineCheckIn = {
         id: `chk-off-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -642,7 +661,7 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         message: `Terverifikasi Offline — ${target.fullName} disimpan ke antrean sinkronisasi.`,
       };
     },
-    [snapshot, isOnline, refreshPendingQueues, getContextHeaders]
+    [snapshot, isOnline, activeUserId, refreshPendingQueues, getContextHeaders]
   );
 
   const checkoutTicket = useCallback(
@@ -831,6 +850,34 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
     [getContextHeaders]
   );
 
+  const reissueAttendee = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/attendees/${id}/reissue`, {
+        method: 'POST',
+        headers: getContextHeaders(),
+      });
+      const data = await parseJsonResponse<{
+        attendee?: Attendee;
+        oldCode?: string;
+        newCode?: string;
+      }>(res, 'Gagal menerbitkan ulang gelang hilang');
+      if (data.attendee) {
+        setSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                attendees: prev.attendees.map((a) =>
+                  a.id === data.attendee!.id ? data.attendee! : a
+                ),
+              }
+            : prev
+        );
+      }
+      return data;
+    },
+    [getContextHeaders]
+  );
+
   const saveDesign = useCallback(
     async (design: WristbandDesign) => {
       const res = await fetch('/api/designs', {
@@ -961,7 +1008,12 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
   );
 
   const loginUser = useCallback(
-    async (input: { email: string; password: string; expectedRole?: UserRole }) => {
+    async (input: {
+      email: string;
+      password: string;
+      expectedRole?: UserRole;
+      expectedLoginMenu?: LoginRoleMenu;
+    }) => {
       if (isOnline) {
         try {
           const res = await fetch('/api/auth/login', {
@@ -994,9 +1046,23 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
       const matched = snapshot.users.find((u) => u.email.toLowerCase() === cleanEmail);
       if (!matched) throw new Error('Email akun tidak ditemukan di cache offline.');
       if (!matched.active) throw new Error('Akun sedang dinonaktifkan.');
+      const isAllScope = Boolean(matched.isOwner || matched.assignedEventIds?.includes('*'));
+      const actualMenu: LoginRoleMenu =
+        matched.role === 'user' ? 'user' : isAllScope ? 'administrator' : 'admin';
+      if (input.expectedLoginMenu && actualMenu !== input.expectedLoginMenu) {
+        throw new Error(
+          `Akun terdaftar pada menu ${
+            actualMenu === 'administrator'
+              ? 'Super Admin'
+              : actualMenu === 'admin'
+                ? 'Admin'
+                : 'Sistem Cek (Gate)'
+          }.`
+        );
+      }
       if (input.expectedRole && matched.role !== input.expectedRole) {
         throw new Error(
-          `Akun terdaftar sebagai ${matched.role === 'administrator' ? 'Administrator' : 'User'}.`
+          `Akun terdaftar sebagai ${matched.role === 'administrator' ? 'Admin' : 'Sistem Cek (Gate)'}.`
         );
       }
       const expectedDefault = matched.role === 'administrator' ? 'admin2026' : 'user2026';
@@ -1179,6 +1245,7 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
     checkoutTicket,
     batchCreateAttendees,
     toggleAttendeeRevoked,
+    reissueAttendee,
     saveDesign,
     createEvent,
     activateEvent,

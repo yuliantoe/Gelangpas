@@ -12,6 +12,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { decryptWristbandTokenClient } from '../lib/crypto.ts';
+import { getRoleCapabilities, type AccessTier } from '../lib/permissions.ts';
 import type {
   AppStateSnapshot,
   DecryptedQrPayload,
@@ -23,7 +24,9 @@ import type {
 
 interface SecurityOfflineViewProps {
   snapshot: AppStateSnapshot;
+  currentUserId?: string;
   currentRole?: UserRole;
+  accessTier?: AccessTier;
   browserOnline: boolean;
   simulatedOffline: boolean;
   setSimulatedOffline: (val: boolean) => void;
@@ -37,7 +40,9 @@ interface SecurityOfflineViewProps {
 
 export const SecurityOfflineView: React.FC<SecurityOfflineViewProps> = ({
   snapshot,
+  currentUserId,
   currentRole = 'administrator',
+  accessTier,
   browserOnline,
   simulatedOffline,
   setSimulatedOffline,
@@ -48,7 +53,10 @@ export const SecurityOfflineView: React.FC<SecurityOfflineViewProps> = ({
   onRotateKey,
   onUpdateNotificationRules,
 }) => {
-  const isAdmin = currentRole === 'administrator';
+  const effectiveTier: AccessTier =
+    accessTier || (currentRole === 'administrator' ? 'admin' : 'gate');
+  const caps = getRoleCapabilities(effectiveTier);
+  const canManageSystemFull = caps.canManageSystemFull;
   const [inspectToken, setInspectToken] = useState(snapshot.attendees[0]?.qrToken || '');
   const [inspectResult, setInspectResult] = useState<{
     valid: boolean;
@@ -74,13 +82,16 @@ export const SecurityOfflineView: React.FC<SecurityOfflineViewProps> = ({
     e.preventDefault();
     setPinError(null);
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (currentUserId) headers['X-User-Id'] = currentUserId;
       const res = await fetch('/api/security/verify-pin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ pin: pinInput }),
       });
       if (!res.ok) {
-        setPinError('PIN salah. Gunakan PIN default penyelenggara: 2026.');
+        const errData = (await res.json().catch(() => ({}))) as { error?: string };
+        setPinError(errData.error || 'PIN salah. Gunakan PIN default penyelenggara: 2026.');
         return;
       }
       setPinUnlocked(true);
@@ -220,9 +231,9 @@ export const SecurityOfflineView: React.FC<SecurityOfflineViewProps> = ({
               </div>
             </div>
 
-            {!isAdmin ? (
+            {!canManageSystemFull ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900">
-                Rotasi kunci enkripsi AES-256-GCM hanya tersedia untuk akun <strong>Administrator</strong>.
+                Pengaturan Sistem Penuh — Rotasi kunci enkripsi AES-256-GCM hanya tersedia untuk akun <strong>Super Admin</strong>.
               </div>
             ) : !pinUnlocked ? (
               <form onSubmit={handleUnlockPin} className="flex flex-wrap items-center gap-2.5">
@@ -366,6 +377,11 @@ export const SecurityOfflineView: React.FC<SecurityOfflineViewProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
+              {!canManageSystemFull && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900">
+                  Mode Pengaturan Sistem Terbatas — Perubahan aturan notifikasi &amp; integrasi otomatis hanya dapat diubah oleh <strong>Super Admin</strong>.
+                </div>
+              )}
               {[
                 {
                   key: 'notifyOnVipArrival' as const,
@@ -386,11 +402,12 @@ export const SecurityOfflineView: React.FC<SecurityOfflineViewProps> = ({
               ].map((rule) => (
                 <label
                   key={rule.key}
-                  className="flex items-center justify-between gap-3 py-1 cursor-pointer"
+                  className={`flex items-center justify-between gap-3 py-1 ${canManageSystemFull ? 'cursor-pointer' : 'opacity-70 cursor-not-allowed'}`}
                 >
                   <span className="text-slate-700">{rule.label}</span>
                   <input
                     type="checkbox"
+                    disabled={!canManageSystemFull}
                     checked={snapshot.notificationRules[rule.key]}
                     onChange={(e) =>
                       onUpdateNotificationRules({ [rule.key]: e.target.checked })
@@ -412,21 +429,23 @@ export const SecurityOfflineView: React.FC<SecurityOfflineViewProps> = ({
                   min={50}
                   max={100}
                   step={5}
+                  disabled={!canManageSystemFull}
                   value={snapshot.notificationRules.capacityThresholdPercent}
                   onChange={(e) =>
                     onUpdateNotificationRules({
                       capacityThresholdPercent: Number(e.target.value),
                     })
                   }
-                  className="w-full accent-blue-600"
+                  className="w-full accent-blue-600 disabled:opacity-60"
                 />
               </div>
 
               <div className="pt-2">
                 <button
                   type="button"
+                  disabled={!canManageSystemFull}
                   onClick={handleToggleBrowserPush}
-                  className="w-full rounded-lg border border-slate-300 bg-white py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="w-full rounded-lg border border-slate-300 bg-white py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 >
                   {snapshot.notificationRules.browserPushEnabled
                     ? 'Notifikasi Desktop Browser Aktif'

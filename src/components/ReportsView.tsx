@@ -1,35 +1,57 @@
 import React, { useMemo } from 'react';
 import { Download, FileSpreadsheet, Printer } from 'lucide-react';
+import { getRoleCapabilities, type AccessTier } from '../lib/permissions.ts';
 import type { AppStateSnapshot, TicketTier } from '../types/event.ts';
 
 interface ReportsViewProps {
   snapshot: AppStateSnapshot;
+  accessTier?: AccessTier;
+  assignedGate?: string;
 }
 
-export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
+export const ReportsView: React.FC<ReportsViewProps> = ({
+  snapshot,
+  accessTier = 'super-admin',
+  assignedGate,
+}) => {
+  const caps = getRoleCapabilities(accessTier);
+  const canViewFinancial = caps.canViewFinancialReports;
+  const isGateScoped =
+    accessTier === 'gate' && Boolean(assignedGate) && assignedGate !== 'Semua Gerbang';
+
   const report = useMemo(() => {
-    const total = snapshot.attendees.length;
-    const checkedIn = snapshot.attendees.filter((a) => a.checkedIn).length;
-    const notCheckedIn = snapshot.attendees.filter((a) => !a.checkedIn && !a.revoked).length;
-    const revoked = snapshot.attendees.filter((a) => a.revoked).length;
+    const scopedAttendees = isGateScoped && assignedGate
+      ? snapshot.attendees.filter((a) => a.gateAssigned === assignedGate)
+      : snapshot.attendees;
+    const scopedLogs = isGateScoped && assignedGate
+      ? snapshot.checkInLogs.filter((l) => l.gate === assignedGate)
+      : snapshot.checkInLogs;
+    const scopedGates = isGateScoped && assignedGate
+      ? snapshot.event.gates.filter((g) => g === assignedGate)
+      : snapshot.event.gates;
+
+    const total = scopedAttendees.length;
+    const checkedIn = scopedAttendees.filter((a) => a.checkedIn).length;
+    const notCheckedIn = scopedAttendees.filter((a) => !a.checkedIn && !a.revoked).length;
+    const revoked = scopedAttendees.filter((a) => a.revoked).length;
     const turnoutPct = total > 0 ? ((checkedIn / total) * 100).toFixed(1) : '0.0';
 
-    const onlineCount = snapshot.checkInLogs.filter(
+    const onlineCount = scopedLogs.filter(
       (l) => l.status === 'verified' && l.mode === 'online'
     ).length;
-    const offlineSyncedCount = snapshot.checkInLogs.filter(
+    const offlineSyncedCount = scopedLogs.filter(
       (l) => l.status === 'verified' && l.mode === 'offline-synced'
     ).length;
-    const blockedAttempts = snapshot.checkInLogs.filter(
+    const blockedAttempts = scopedLogs.filter(
       (l) => l.status !== 'verified'
     ).length;
 
-    const gateBreakdown = snapshot.event.gates.map((gate) => {
-      const assigned = snapshot.attendees.filter((a) => a.gateAssigned === gate).length;
-      const entered = snapshot.attendees.filter(
+    const gateBreakdown = scopedGates.map((gate) => {
+      const assigned = scopedAttendees.filter((a) => a.gateAssigned === gate).length;
+      const entered = scopedAttendees.filter(
         (a) => a.checkedIn && a.checkedInGate === gate
       ).length;
-      const blocked = snapshot.checkInLogs.filter(
+      const blocked = scopedLogs.filter(
         (l) => l.gate === gate && l.status !== 'verified'
       ).length;
       const rate = assigned > 0 ? Math.round((entered / assigned) * 100) : 0;
@@ -39,20 +61,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
     const tiers: TicketTier[] = Array.from(
       new Set([
         ...(snapshot.event.categories?.map((c) => c.name) || Object.keys(snapshot.event.ticketPrices)),
-        ...snapshot.attendees.map((a) => a.tier),
+        ...scopedAttendees.map((a) => a.tier),
       ])
     );
     const tierBreakdown = tiers.map((tier) => {
-      const issued = snapshot.attendees.filter((a) => a.tier === tier).length;
-      const entered = snapshot.attendees.filter((a) => a.tier === tier && a.checkedIn).length;
-      const revenue = snapshot.attendees
-        .filter((a) => a.tier === tier)
-        .reduce((sum, a) => sum + a.amountPaid, 0);
+      const issued = scopedAttendees.filter((a) => a.tier === tier).length;
+      const entered = scopedAttendees.filter((a) => a.tier === tier && a.checkedIn).length;
+      const revenue = canViewFinancial
+        ? scopedAttendees
+            .filter((a) => a.tier === tier)
+            .reduce((sum, a) => sum + a.amountPaid, 0)
+        : 0;
       const rate = issued > 0 ? Math.round((entered / issued) * 100) : 0;
       return { tier, issued, entered, rate, revenue };
     });
 
     return {
+      scopedAttendees,
+      scopedLogs,
       total,
       checkedIn,
       notCheckedIn,
@@ -64,7 +90,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
       gateBreakdown,
       tierBreakdown,
     };
-  }, [snapshot]);
+  }, [snapshot, isGateScoped, assignedGate, canViewFinancial]);
 
   const exportCsv = () => {
     const header = [
@@ -73,22 +99,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
       'Email',
       'Kategori',
       'Gerbang Ditugaskan',
-      'Metode Bayar',
-      'Nominal (IDR)',
+      ...(canViewFinancial ? ['Metode Bayar', 'Nominal (IDR)'] : []),
       'Sudah Check-In',
       'Waktu Check-In',
       'Gerbang Check-In',
       'Mode Verifikasi',
       'Diblokir',
     ];
-    const rows = snapshot.attendees.map((a) => [
+    const rows = report.scopedAttendees.map((a) => [
       a.ticketCode,
       `"${a.fullName.replace(/"/g, '""')}"`,
       a.email,
       a.tier,
       `"${a.gateAssigned}"`,
-      a.paymentMethod,
-      a.amountPaid,
+      ...(canViewFinancial ? [a.paymentMethod, a.amountPaid] : []),
       a.checkedIn ? 'YA' : 'TIDAK',
       a.checkedInAt || '-',
       a.checkedInGate || '-',
@@ -108,10 +132,29 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
   const exportJson = () => {
     const payload = {
       exportedAt: new Date().toISOString(),
+      accessScope: accessTier === 'gate' ? 'terbatas-gate-sendiri' : accessTier === 'admin' ? 'operasional' : 'penuh-finansial',
       event: snapshot.event,
-      summary: report,
-      checkInLogs: snapshot.checkInLogs,
-      transactions: snapshot.transactions,
+      summary: {
+        total: report.total,
+        checkedIn: report.checkedIn,
+        notCheckedIn: report.notCheckedIn,
+        revoked: report.revoked,
+        turnoutPct: report.turnoutPct,
+        onlineCount: report.onlineCount,
+        offlineSyncedCount: report.offlineSyncedCount,
+        blockedAttempts: report.blockedAttempts,
+        gateBreakdown: report.gateBreakdown,
+        tierBreakdown: canViewFinancial
+          ? report.tierBreakdown
+          : report.tierBreakdown.map(({ tier, issued, entered, rate }) => ({
+              tier,
+              issued,
+              entered,
+              rate,
+            })),
+      },
+      checkInLogs: report.scopedLogs,
+      ...(canViewFinancial ? { transactions: snapshot.transactions } : {}),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -122,6 +165,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
     URL.revokeObjectURL(url);
   };
 
+  const scopeLabel =
+    accessTier === 'gate'
+      ? `Terbatas Gate Sendiri (${assignedGate || 'Semua Gerbang'})`
+      : accessTier === 'admin'
+      ? 'Laporan Operasional (Non-Finansial)'
+      : 'Laporan Penuh + Finansial';
+
   return (
     <div className="space-y-6">
       {/* Header & Export Toolbar */}
@@ -131,7 +181,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
             Laporan Statistik Kehadiran Real-Time
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            {snapshot.event.title} · {snapshot.event.venue} · {snapshot.event.dateLabel}
+            {snapshot.event.title} · {snapshot.event.venue} · {scopeLabel}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -245,7 +295,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200">
             <h3 className="font-display text-sm font-semibold text-slate-900">
-              Statistik per Kategori & Pendapatan
+              {canViewFinancial
+                ? 'Statistik per Kategori & Pendapatan'
+                : 'Statistik Kehadiran per Kategori'}
             </h3>
           </div>
           <table className="w-full text-left border-collapse text-xs">
@@ -254,7 +306,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
                 <th className="py-2.5 px-6">Kategori</th>
                 <th className="py-2.5 px-3 text-right">Terbit</th>
                 <th className="py-2.5 px-3 text-right">Hadir</th>
-                <th className="py-2.5 px-6 text-right">Pendapatan (IDR)</th>
+                <th className="py-2.5 px-6 text-right">
+                  {canViewFinancial ? 'Pendapatan (IDR)' : 'Rasio Hadir'}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -268,7 +322,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
                     {t.entered} ({t.rate}%)
                   </td>
                   <td className="py-3 px-6 text-right font-mono tabular-nums font-semibold text-slate-900">
-                    Rp {t.revenue.toLocaleString('id-ID')}
+                    {canViewFinancial ? `Rp ${t.revenue.toLocaleString('id-ID')}` : `${t.rate}%`}
                   </td>
                 </tr>
               ))}
@@ -281,7 +335,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <h3 className="font-display text-sm font-semibold text-slate-900">
-            Log Audit Verifikasi Gerbang ({snapshot.checkInLogs.length} Rekaman)
+            Log Audit Verifikasi Gerbang ({report.scopedLogs.length} Rekaman)
           </h3>
         </div>
         <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
@@ -296,7 +350,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ snapshot }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {snapshot.checkInLogs.map((log) => (
+              {report.scopedLogs.map((log) => (
                 <tr key={log.id}>
                   <td className="py-2.5 px-6 font-mono text-slate-500 tabular-nums whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleString('id-ID')}

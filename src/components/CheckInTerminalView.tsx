@@ -12,6 +12,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import type { CheckInResult } from '../hooks/useEventSync.ts';
+import type { AccessTier } from '../lib/permissions.ts';
 import type { AppStateSnapshot } from '../types/event.ts';
 
 interface CheckInTerminalViewProps {
@@ -20,6 +21,7 @@ interface CheckInTerminalViewProps {
   pendingCount: number;
   syncing: boolean;
   defaultGate?: string;
+  accessTier?: AccessTier;
   onSyncNow: () => Promise<unknown>;
   onCheckIn: (input: { qrToken?: string; ticketCode?: string; gate: string }) => Promise<CheckInResult>;
 }
@@ -53,14 +55,28 @@ export const CheckInTerminalView: React.FC<CheckInTerminalViewProps> = ({
   pendingCount,
   syncing,
   defaultGate,
+  accessTier = 'super-admin',
   onSyncNow,
   onCheckIn,
 }) => {
-  const initialGate =
-    defaultGate && snapshot.event.gates.includes(defaultGate)
+  const isGateLocked =
+    accessTier === 'gate' && Boolean(defaultGate) && defaultGate !== 'Semua Gerbang';
+  const gateOptions =
+    isGateLocked && defaultGate && !snapshot.event.gates.includes(defaultGate)
+      ? [defaultGate, ...snapshot.event.gates]
+      : snapshot.event.gates;
+  const initialGate = isGateLocked && defaultGate
+    ? defaultGate
+    : defaultGate && snapshot.event.gates.includes(defaultGate)
       ? defaultGate
       : snapshot.event.gates[0] || 'Gerbang Utama A';
   const [selectedGate, setSelectedGate] = useState(initialGate);
+
+  useEffect(() => {
+    if (isGateLocked && defaultGate) {
+      setSelectedGate(defaultGate);
+    }
+  }, [isGateLocked, defaultGate]);
   const [manualInput, setManualInput] = useState('');
   const [quickFilter, setQuickFilter] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
@@ -206,6 +222,7 @@ export const CheckInTerminalView: React.FC<CheckInTerminalViewProps> = ({
 
   const pendingGuests = snapshot.attendees.filter((a) => {
     if (a.checkedIn) return false;
+    if (isGateLocked && defaultGate && a.gateAssigned !== defaultGate) return false;
     if (!quickFilter.trim()) return true;
     const q = quickFilter.toLowerCase();
     return (
@@ -226,15 +243,21 @@ export const CheckInTerminalView: React.FC<CheckInTerminalViewProps> = ({
           <select
             id="gate-select"
             value={selectedGate}
+            disabled={isGateLocked}
             onChange={(e) => setSelectedGate(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-slate-100 disabled:text-slate-700 disabled:cursor-not-allowed"
           >
-            {snapshot.event.gates.map((gate) => (
+            {gateOptions.map((gate) => (
               <option key={gate} value={gate}>
                 {gate}
               </option>
             ))}
           </select>
+          {isGateLocked && (
+            <span className="text-xs font-medium text-amber-800">
+              Terkunci sesuai gate/zona tugas ({defaultGate})
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

@@ -1169,6 +1169,14 @@ export function createGelangPassApp(hooks: RealtimeHooks = {}) {
     return created;
   }
 
+  app.get('/api', (_req, res) => {
+    res.json({
+      ok: true,
+      service: 'gelangpass-api',
+      runtime: IS_VERCEL ? 'vercel-serverless' : 'node-server',
+    });
+  });
+
   app.get('/api/health', (_req, res) => {
     res.json({
       ok: true,

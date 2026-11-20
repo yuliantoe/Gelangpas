@@ -42,6 +42,34 @@ export interface CheckInResult {
   offlineQueued?: boolean;
 }
 
+class NonJsonResponseError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function parseJsonResponse<T>(res: Response, fallbackError: string): Promise<T> {
+  const raw = await res.text();
+  if (!raw.trim()) {
+    throw new NonJsonResponseError(res.status, `${fallbackError} (HTTP ${res.status})`);
+  }
+  let parsed: T & { error?: string };
+  try {
+    parsed = JSON.parse(raw) as T & { error?: string };
+  } catch {
+    throw new NonJsonResponseError(
+      res.status,
+      `Server API tidak merespons JSON (HTTP ${res.status}). Pastikan fungsi serverless /api berjalan normal.`
+    );
+  }
+  if (!res.ok) {
+    throw new Error(parsed.error || `${fallbackError} (HTTP ${res.status})`);
+  }
+  return parsed;
+}
+
 export function useEventSync(sessionContext?: { userId?: string; eventId?: string }) {
   const activeUserId = sessionContext?.userId || '';
   const preferredEventId = sessionContext?.eventId || '';
@@ -398,12 +426,11 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ checkIns: chk, orders: ord }),
       });
-      if (!res.ok) throw new Error('Sync failed');
-      const data = (await res.json()) as {
+      const data = await parseJsonResponse<{
         syncedCheckIns: number;
         syncedOrders: number;
         snapshot: AppStateSnapshot;
-      };
+      }>(res, 'Gagal menyinkronkan data offline');
       await Promise.all([
         clearSyncedOfflineCheckIns(chk.map((c) => c.id)),
         clearSyncedOfflineOrders(ord.map((o) => o.id)),
@@ -634,14 +661,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
           headers: getContextHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(input),
         });
-        if (!res.ok) {
-          const err = (await res.json()) as { error?: string };
-          throw new Error(err.error || 'Gagal memproses pembayaran');
-        }
-        const data = (await res.json()) as {
+        const data = await parseJsonResponse<{
           attendees: Attendee[];
           transaction: PaymentTransaction;
-        };
+        }>(res, 'Gagal memproses pembayaran');
         setSnapshot((prev) => {
           if (!prev) return prev;
           const existingAttIds = new Set(prev.attendees.map((a) => a.id));
@@ -762,8 +785,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(input),
       });
-      if (!res.ok) throw new Error('Gagal membuat gelang massal.');
-      const data = (await res.json()) as { created: Attendee[] };
+      const data = await parseJsonResponse<{ created: Attendee[] }>(
+        res,
+        'Gagal membuat gelang massal'
+      );
       setSnapshot((prev) => {
         if (!prev) return prev;
         const existingIds = new Set(prev.attendees.map((a) => a.id));
@@ -785,8 +810,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ revoked }),
       });
-      if (!res.ok) throw new Error('Gagal mengubah status gelang.');
-      const data = (await res.json()) as { attendee?: Attendee };
+      const data = await parseJsonResponse<{ attendee?: Attendee }>(
+        res,
+        'Gagal mengubah status gelang'
+      );
       if (data.attendee) {
         setSnapshot((prev) =>
           prev
@@ -811,11 +838,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(design),
       });
-      if (!res.ok) throw new Error('Gagal menyimpan desain gelang.');
-      const data = (await res.json()) as {
+      const data = await parseJsonResponse<{
         design: WristbandDesign;
         activeDesignId: string;
-      };
+      }>(res, 'Gagal menyimpan desain gelang');
       if (data.design) {
         setSnapshot((prev) => {
           if (!prev) return prev;
@@ -858,12 +884,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(input),
       });
-      const data = (await res.json()) as {
+      const data = await parseJsonResponse<{
         event?: EventInfo;
         snapshot?: AppStateSnapshot;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error || 'Gagal menambahkan acara baru.');
+      }>(res, 'Gagal menambahkan acara baru');
       if (data.snapshot) setSnapshot(data.snapshot);
       return data;
     },
@@ -876,8 +900,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         method: 'POST',
         headers: getContextHeaders(),
       });
-      const data = (await res.json()) as { snapshot?: AppStateSnapshot; error?: string };
-      if (!res.ok) throw new Error(data.error || 'Gagal mengaktifkan acara.');
+      const data = await parseJsonResponse<{ snapshot?: AppStateSnapshot }>(
+        res,
+        'Gagal mengaktifkan acara'
+      );
       if (data.snapshot) setSnapshot(data.snapshot);
       return data.snapshot!;
     },
@@ -890,8 +916,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         method: 'DELETE',
         headers: getContextHeaders(),
       });
-      const data = (await res.json()) as { ok?: boolean; snapshot?: AppStateSnapshot; error?: string };
-      if (!res.ok) throw new Error(data.error || 'Gagal menghapus acara.');
+      const data = await parseJsonResponse<{ ok?: boolean; snapshot?: AppStateSnapshot }>(
+        res,
+        'Gagal menghapus acara'
+      );
       if (data.snapshot) setSnapshot(data.snapshot);
       return data;
     },
@@ -905,12 +933,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(patch),
       });
-      const data = (await res.json()) as {
+      const data = await parseJsonResponse<{
         event?: EventInfo;
         snapshot?: AppStateSnapshot;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error || 'Gagal memperbarui info acara.');
+      }>(res, 'Gagal memperbarui info acara');
       if (data.snapshot) setSnapshot(data.snapshot);
       return data;
     },
@@ -924,12 +950,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ categories }),
       });
-      const data = (await res.json()) as {
+      const data = await parseJsonResponse<{
         event?: EventInfo;
         snapshot?: AppStateSnapshot;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan kategori & harga tiket.');
+      }>(res, 'Gagal menyimpan kategori & harga tiket');
       if (data.snapshot) setSnapshot(data.snapshot);
       return data;
     },
@@ -945,19 +969,20 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(input),
           });
-          const data = (await res.json()) as {
+          const data = await parseJsonResponse<{
             user?: PlatformUser;
             recommendedEventId?: string;
-            error?: string;
-          };
-          if (!res.ok) throw new Error(data.error || 'Gagal masuk ke panel penyelenggara.');
+          }>(res, 'Gagal masuk ke panel penyelenggara');
           return {
             user: data.user!,
             recommendedEventId: data.recommendedEventId || data.user!.assignedEventIds[0],
           };
         } catch (err) {
-          if (err instanceof TypeError) {
-            // Network drop -> fall through to offline cache auth
+          if (err instanceof TypeError || err instanceof NonJsonResponseError) {
+            if (!snapshot) {
+              throw err;
+            }
+            // Fall through to cached user credential verification if API proxy/endpoint was unreachable
           } else {
             throw err;
           }
@@ -1001,13 +1026,11 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       });
-      const data = (await res.json()) as {
+      const data = await parseJsonResponse<{
         user?: PlatformUser;
         event?: EventInfo;
         snapshot?: AppStateSnapshot;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error || 'Gagal mendaftarkan penyelenggara baru.');
+      }>(res, 'Gagal mendaftarkan penyelenggara baru');
       if (data.snapshot) setSnapshot(data.snapshot);
       return { user: data.user!, event: data.event!, snapshot: data.snapshot };
     },
@@ -1029,8 +1052,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(input),
       });
-      const data = (await res.json()) as { user?: PlatformUser; error?: string };
-      if (!res.ok) throw new Error(data.error || 'Gagal menambahkan pengguna.');
+      const data = await parseJsonResponse<{ user?: PlatformUser }>(
+        res,
+        'Gagal menambahkan pengguna'
+      );
       if (data.user) {
         setSnapshot((prev) => {
           if (!prev) return prev;
@@ -1050,8 +1075,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         headers: getContextHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(patch),
       });
-      const data = (await res.json()) as { user?: PlatformUser; error?: string };
-      if (!res.ok) throw new Error(data.error || 'Gagal memperbarui pengguna.');
+      const data = await parseJsonResponse<{ user?: PlatformUser }>(
+        res,
+        'Gagal memperbarui pengguna'
+      );
       if (data.user) {
         setSnapshot((prev) =>
           prev
@@ -1073,8 +1100,7 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
         method: 'DELETE',
         headers: getContextHeaders(),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok) throw new Error(data.error || 'Gagal menghapus pengguna.');
+      const data = await parseJsonResponse<{ ok?: boolean }>(res, 'Gagal menghapus pengguna');
       setSnapshot((prev) =>
         prev
           ? {
@@ -1093,8 +1119,10 @@ export function useEventSync(sessionContext?: { userId?: string; eventId?: strin
       method: 'POST',
       headers: getContextHeaders(),
     });
-    if (!res.ok) throw new Error('Gagal merotasi kunci AES-256-GCM.');
-    const data = (await res.json()) as { snapshot: AppStateSnapshot };
+    const data = await parseJsonResponse<{ snapshot: AppStateSnapshot }>(
+      res,
+      'Gagal merotasi kunci AES-256-GCM'
+    );
     setSnapshot(data.snapshot);
     return data.snapshot;
   }, [getContextHeaders]);
